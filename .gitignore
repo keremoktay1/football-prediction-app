@@ -1,51 +1,30 @@
-# Python
 __pycache__/
-*.py[cod]
+*.pyc
 *.pyo
 *.pyd
 .Python
 *.egg-info/
+.eggs/
 dist/
 build/
-.eggs/
-*.egg
-
-# Jupyter
-.ipynb_checkpoints/
-*.ipynb_checkpoints
-
-# Virtual environments
-.venv/
-venv/
-env/
-ENV/
-
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-
-# IDE
-.vscode/
-.idea/
-*.sublime-project
-*.sublime-workspace
-
-# Data — raw CSV'ler repoda tutulmayabilir (büyük dosyalar)
-# Küçük fixture dosyaları ise tutulabilir
-data/raw/results.csv
-data/raw/elo_ratings_wc2026.csv
-data/raw/goalscorers.csv
-data/raw/players_data-2025_2026.csv
-data/raw/shootouts.csv
-
-# Processed çıktılar
-data/processed/
-
-# Model dosyaları
-*.pkl
-*.joblib
-
-# Secrets
 .env
-secrets.toml
+.venv
+venv/
+.DS_Store
+*.log
+
+# Büyük ham veri dosyaları (git LFS veya harici)
+data/raw/
+# Eğitimle üretilen modeller (scripts/ ile yeniden üretilir)
+models/
+# Yürütülmüş notebook çıktıları
+notebooks/*_executed.ipynb
+# Streamlit önbellek
+.streamlit/
+
+# Conda artık dosyaları
+=1.11
+=1.3
+=1.35
+=2.0
+=5.18

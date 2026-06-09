@@ -1,0 +1,269 @@
+"""
+prediction_engine.py — Turnuva maç tahminleri.
+
+Kapsam:
+  - Grup aşaması  : predictions_latest.csv'den önceden hesaplanmış olasılıklar
+  - Eleme aşaması : Elo tabanlı (beraberlik yok — uzatma/penaltı dahil tek kazanan)
+
+Bu modül YALNIZCA turnuva fikstüründeki maçlar için tahmin üretir.
+"""
+from __future__ import annotations
+
+import os
+import sys
+import numpy as np
+import pandas as pd
+from scipy.stats import poisson as scipy_poisson
+from typing import Dict, List, Optional, Tuple
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from config import FILES, BASE_GOAL_RATE
+
+# Notebook 03 ile birebir eşleşen sütun ve sabit isimleri
+FEATURE_COLS = [
+    "elo_diff",
+    "form_diff",
+    "weighted_form_home",
+    "weighted_form_away",
+    "attack_home",
+    "defense_home",
+    "attack_away",
+    "defense_away",
+    "neutral",
+    "tournament_weight",
+]
+
+POISSON_FEATURES = [
+    "elo_diff",
+    "attack_home",
+    "defense_away",
+    "neutral",
+    "tournament_weight",
+]
+
+UNKNOWN_ELO = 1700  # Playoff takımları için varsayılan
+
+
+# ──────────────────────────────────────────────
+# Yardımcı: Elo
+# ──────────────────────────────────────────────
+
+def _get_elo(team: str, elo_map: Dict[str, float]) -> float:
+    """Takımın Elo derecesini döner. Bulunamazsa UNKNOWN_ELO."""
+    return elo_map.get(team, UNKNOWN_ELO)
+
+
+def _elo_win_prob(elo_a: float, elo_b: float, home_advantage: float = 0.0) -> float:
+    """P(A kazanır) — beraberlik yok (eleme formatı)."""
+    return 1.0 / (1.0 + 10.0 ** (-(elo_a - elo_b + home_advantage) / 400.0))
+
+
+def _elo_to_3way(elo_home: float, elo_away: float, neutral: bool = True) -> Tuple[float, float, float]:
+    """
+    Elo farkından 3-sonuçlu olasılık (H/D/A).
+    Grup aşaması için (beraberlik mümkün).
+    Davidson modeli: ~%22 beraberlik oranı.
+    """
+    advantage = 0.0 if neutral else 100.0
+    we = _elo_win_prob(elo_home, elo_away, advantage)
+    draw_frac = 0.22
+    ph = we * (1.0 - draw_frac)
+    pa = (1.0 - we) * (1.0 - draw_frac)
+    pd_ = draw_frac
+    total = ph + pd_ + pa
+    return round(ph / total, 4), round(pd_ / total, 4), round(pa / total, 4)
+
+
+# ──────────────────────────────────────────────
+# Grup maçı tahmini (predictions_latest.csv)
+# ──────────────────────────────────────────────
+
+def get_group_prediction(
+    match_id: int,
+    predictions: Optional[pd.DataFrame],
+    elo_map: Optional[Dict[str, float]] = None,
+    home_team: str = "",
+    away_team: str = "",
+) -> dict:
+    """
+    Grup maçı için tahmin döner.
+    1. predictions_latest.csv'de varsa → oradaki değerleri kullan
+    2. Yoksa → Elo tabanlı fallback
+    """
+    if predictions is not None and not predictions.empty:
+        row = predictions[predictions["match_id"] == match_id]
+        if not row.empty:
+            r = row.iloc[0]
+            return {
+                "p_home":        float(r.get("p_home", 1 / 3)),
+                "p_draw":        float(r.get("p_draw", 1 / 3)),
+                "p_away":        float(r.get("p_away", 1 / 3)),
+                "lambda_home":   float(r["lambda_home"]) if "lambda_home" in r.index else None,
+                "lambda_away":   float(r["lambda_away"]) if "lambda_away" in r.index else None,
+                "over_2_5":      float(r["over_2_5"])    if "over_2_5" in r.index    else None,
+                "btts":          float(r["btts"])        if "btts" in r.index        else None,
+                "favourite":     str(r["favourite"])     if "favourite" in r.index   else None,
+                "upset_risk":    str(r["upset_risk"])    if "upset_risk" in r.index  else None,
+                "source":        "predictions_latest",
+            }
+
+    # Elo fallback
+    elo_map = elo_map or {}
+    elo_h = _get_elo(home_team, elo_map)
+    elo_a = _get_elo(away_team, elo_map)
+    ph, pd_, pa = _elo_to_3way(elo_h, elo_a, neutral=True)
+    lh, la = _estimate_xg(elo_h, elo_a)
+    return {
+        "p_home":      ph,
+        "p_draw":      pd_,
+        "p_away":      pa,
+        "lambda_home": lh,
+        "lambda_away": la,
+        "over_2_5":    None,
+        "btts":        None,
+        "favourite":   None,
+        "upset_risk":  None,
+        "source":      "elo_fallback",
+    }
+
+
+# ──────────────────────────────────────────────
+# Model tahmini (LR + Poisson pipeline — notebook 03)
+# ──────────────────────────────────────────────
+
+def predict_with_model(
+    features_row: pd.Series,
+    models: dict,
+) -> Optional[dict]:
+    """
+    Yüklü modeller ile bir maç tahmini yapar.
+    features_row: features_2026_fixtures.csv'den bir satır (FEATURE_COLS içermeli).
+
+    Returns None eğer model yüklenemezse veya hata olursa.
+    """
+    lr_model    = models.get("lr_model")
+    preprocessor = models.get("preprocessor")
+    home_goal   = models.get("home_goal_model")
+    away_goal   = models.get("away_goal_model")
+    poi_imp     = models.get("poisson_imputer")
+    poi_scl     = models.get("poisson_scaler")
+
+    if lr_model is None or preprocessor is None:
+        return None
+
+    try:
+        # --- LR olasılıkları ---
+        X_lr = features_row[FEATURE_COLS].values.reshape(1, -1)
+        X_lr_t = preprocessor.transform(pd.DataFrame([features_row[FEATURE_COLS]]))
+        proba = lr_model.predict_proba(X_lr_t)[0]
+        classes = list(lr_model.classes_)
+
+        p = {"p_home": 1 / 3, "p_draw": 1 / 3, "p_away": 1 / 3}
+        for i, cls in enumerate(classes):
+            if cls == 0:
+                p["p_home"] = float(proba[i])
+            elif cls == 1:
+                p["p_draw"] = float(proba[i])
+            elif cls == 2:
+                p["p_away"] = float(proba[i])
+
+        # --- Poisson lambda ---
+        lh = la = None
+        if home_goal and away_goal and poi_imp and poi_scl:
+            try:
+                X_poi = features_row[POISSON_FEATURES].values.reshape(1, -1)
+                X_poi_imp = poi_imp.transform(X_poi)
+                X_poi_scl = poi_scl.transform(X_poi_imp)
+                lh = max(0.3, float(home_goal.predict(X_poi_scl)[0]))
+                la = max(0.3, float(away_goal.predict(X_poi_scl)[0]))
+            except Exception:
+                pass
+
+        return {"source": "lr_model", "lambda_home": lh, "lambda_away": la, **p}
+
+    except Exception:
+        return None
+
+
+# ──────────────────────────────────────────────
+# Eleme maçı tahmini (Elo, beraberlik yok)
+# ──────────────────────────────────────────────
+
+def get_knockout_prediction(
+    home_team: str,
+    away_team: str,
+    elo_map: Dict[str, float],
+    neutral: bool = True,
+) -> dict:
+    """
+    Eleme maçı için Elo tabanlı tahmin.
+    Beraberlik yoktur — bir kazanan belirlenir (uzatma/PSO dahil).
+    """
+    elo_h = _get_elo(home_team, elo_map)
+    elo_a = _get_elo(away_team, elo_map)
+    advantage = 0.0 if neutral else 60.0  # eleme maçları genellikle nötr saha
+    ph = _elo_win_prob(elo_h, elo_a, advantage)
+    pa = 1.0 - ph
+    lh, la = _estimate_xg(elo_h, elo_a)
+
+    return {
+        "p_home":    round(ph, 4),
+        "p_draw":    None,          # eleme turunda beraberlik yok
+        "p_away":    round(pa, 4),
+        "elo_home":  round(elo_h),
+        "elo_away":  round(elo_a),
+        "lambda_home": lh,
+        "lambda_away": la,
+        "source":    "elo",
+    }
+
+
+# ──────────────────────────────────────────────
+# xG tahmini
+# ──────────────────────────────────────────────
+
+def _estimate_xg(elo_home: float, elo_away: float) -> Tuple[float, float]:
+    """Elo farkından basit xG tahmini."""
+    diff = (elo_home - elo_away) / 400.0
+    factor = 0.5 + 0.5 * np.tanh(diff)
+    total = 2.7
+    xg_h = round(max(0.3, min(total * factor, 4.5)), 2)
+    xg_a = round(max(0.3, min(total * (1.0 - factor), 4.5)), 2)
+    return xg_h, xg_a
+
+
+# ──────────────────────────────────────────────
+# Poisson skor tablosu
+# ──────────────────────────────────────────────
+
+def poisson_score_table(
+    lambda_home: float,
+    lambda_away: float,
+    max_goals: int = 7,
+) -> pd.DataFrame:
+    """En olası 10 skoru Poisson ile döner."""
+    rows = []
+    for h in range(max_goals + 1):
+        for a in range(max_goals + 1):
+            prob = scipy_poisson.pmf(h, lambda_home) * scipy_poisson.pmf(a, lambda_away)
+            rows.append({"score": f"{h}-{a}", "home_g": h, "away_g": a, "prob": prob})
+    df = pd.DataFrame(rows).sort_values("prob", ascending=False).head(10).reset_index(drop=True)
+    df["prob_pct"] = (df["prob"] * 100).round(1).astype(str) + "%"
+    return df[["score", "prob_pct", "prob"]]
+
+
+# ──────────────────────────────────────────────
+# Tüm turnuva takımları
+# ──────────────────────────────────────────────
+
+def get_tournament_teams() -> List[str]:
+    """GROUP_FIXTURES.CSV'deki tüm unique takım isimlerini döner (Playoff dahil)."""
+    path = FILES.get("group_fixtures", "")
+    if not os.path.exists(path):
+        return []
+    try:
+        df = pd.read_csv(path)
+        teams = set(df["home_team"].dropna().astype(str)) | set(df["away_team"].dropna().astype(str))
+        return sorted(teams)
+    except Exception:
+        return []
