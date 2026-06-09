@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Data — raw CSV'ler repoda tutulmayabilir (büyük dosyalar)
+# Küçük fixture dosyaları ise tutulabilir
+data/raw/results.csv
+data/raw/elo_ratings_wc2026.csv
+data/raw/goalscorers.csv
+data/raw/players_data-2025_2026.csv
+data/raw/shootouts.csv
+
+# Processed çıktılar
+data/processed/
+
+# Model dosyaları
+*.pkl
+*.joblib
+
+# Secrets
+.env
+secrets.toml
