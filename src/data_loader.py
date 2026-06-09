@@ -233,6 +233,21 @@ def load_models() -> Optional[dict]:
 # Elo map yardımcısı
 # ──────────────────────────────────────────────
 
+# ──────────────────────────────────────────────
+# Model karşılaştırma sonuçları
+# ──────────────────────────────────────────────
+
+def load_model_comparison() -> Optional[pd.DataFrame]:
+    """data/processed/model_comparison.csv yükler."""
+    path = os.path.join(PROCESSED_DIR, "model_comparison.csv")
+    if not os.path.exists(path):
+        return None
+    try:
+        return pd.read_csv(path)
+    except Exception:
+        return None
+
+
 def build_elo_map(elo_df: Optional[pd.DataFrame] = None) -> dict:
     """
     team_name → elo_rating sözlüğü döner.
