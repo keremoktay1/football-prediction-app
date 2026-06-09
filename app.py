@@ -10,7 +10,10 @@ import streamlit as st
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(APP_DIR, "src"))
 
-from data_loader import load_fixtures, load_match_updates, load_predictions, load_models
+from data_loader import (
+    load_fixtures, load_match_updates, load_predictions, load_models,
+    load_playoff_overrides, save_playoff_override,
+)
 
 # ── Sayfa konfigürasyonu ─────────────────────────────────────────────────────
 st.set_page_config(
@@ -33,6 +36,30 @@ st.sidebar.markdown(
     - 📊 Model Performance — Canlı doğruluk takibi
     """
 )
+st.sidebar.markdown("---")
+
+# ── Playoff Takım İsimleri ────────────────────────────────────────────────────
+_PO_SLOTS = [
+    "UEFA Playoff A", "UEFA Playoff B", "UEFA Playoff C", "UEFA Playoff D",
+    "FIFA Playoff 1", "FIFA Playoff 2",
+]
+
+with st.sidebar.expander("🏟️ Playoff Takımları", expanded=False):
+    _current_overrides = load_playoff_overrides()
+    _new_vals = {}
+    for _slot in _PO_SLOTS:
+        _new_vals[_slot] = st.text_input(
+            _slot,
+            value=_current_overrides.get(_slot, ""),
+            placeholder="Takım adı girin",
+            key=f"po_{_slot}",
+        )
+    if st.button("💾 Kaydet", key="po_save"):
+        for _slot, _val in _new_vals.items():
+            save_playoff_override(_slot, _val.strip())
+        st.success("Playoff isimleri güncellendi!")
+        st.rerun()
+
 st.sidebar.markdown("---")
 
 # ── Veri yükle ───────────────────────────────────────────────────────────────

@@ -116,6 +116,12 @@ results_clean = results.dropna(subset=["home_score", "away_score"]).copy()
 results_clean["home_score"] = results_clean["home_score"].astype(int)
 results_clean["away_score"] = results_clean["away_score"].astype(int)
 
+# ── 2000 öncesini filtrele ────────────────────────────────────────────────────
+results_clean = results_clean[
+    results_clean["date"] >= pd.Timestamp("2000-01-01")
+].reset_index(drop=True)
+print(f"  2000+ maç filtresi uygulandı: {len(results_clean):,} satır")
+
 def _points(gf, ga):
     if gf > ga:   return 3
     if gf == ga:  return 1
@@ -148,21 +154,81 @@ for team in all_teams:
 print(f"Takım geçmişleri hazır: {len(team_history)} takım")
 
 
+# ── H2H pre-indexing ──────────────────────────────────────────────────────────
+print("\nH2H ve ortak rakip indexleri oluşturuluyor...")
+
+# h2h_history: (team_a, team_b) alfabetik → sorted arrays
+# diff: team_a lehine gol farkı (team_a - team_b)
+_h2h_tmp: dict[tuple, dict] = {}
+for _, row in results_clean.iterrows():
+    h, a = row["home_team"], row["away_team"]
+    hs, as_ = int(row["home_score"]), int(row["away_score"])
+    d = row["date"]
+    key = (min(h, a), max(h, a))
+    # diff from perspective of min-alphabetical team
+    diff = (hs - as_) if h <= a else (as_ - hs)
+    if key not in _h2h_tmp:
+        _h2h_tmp[key] = {"dates": [], "diff": []}
+    _h2h_tmp[key]["dates"].append(d)
+    _h2h_tmp[key]["diff"].append(diff)
+
+h2h_history: dict[tuple, dict] = {}
+for key, data in _h2h_tmp.items():
+    sorted_pairs = sorted(zip(data["dates"], data["diff"]))
+    h2h_history[key] = {
+        "dates": np.array([x[0] for x in sorted_pairs], dtype="datetime64[ns]"),
+        "diff":  np.array([x[1] for x in sorted_pairs], dtype=float),
+    }
+
+# team_vs_opp: team → opponent → sorted arrays (dates, gf, ga)
+_tvo_tmp: dict[str, dict[str, dict]] = {}
+for _, row in results_clean.iterrows():
+    h, a = row["home_team"], row["away_team"]
+    hs, as_ = int(row["home_score"]), int(row["away_score"])
+    d = row["date"]
+    for team, opp, gf, ga in [(h, a, hs, as_), (a, h, as_, hs)]:
+        if team not in _tvo_tmp:
+            _tvo_tmp[team] = {}
+        if opp not in _tvo_tmp[team]:
+            _tvo_tmp[team][opp] = {"dates": [], "gf": [], "ga": []}
+        _tvo_tmp[team][opp]["dates"].append(d)
+        _tvo_tmp[team][opp]["gf"].append(gf)
+        _tvo_tmp[team][opp]["ga"].append(ga)
+
+team_vs_opp: dict[str, dict[str, dict]] = {}
+for team, opps in _tvo_tmp.items():
+    team_vs_opp[team] = {}
+    for opp, data in opps.items():
+        sorted_triples = sorted(zip(data["dates"], data["gf"], data["ga"]))
+        team_vs_opp[team][opp] = {
+            "dates": np.array([x[0] for x in sorted_triples], dtype="datetime64[ns]"),
+            "gf":    np.array([x[1] for x in sorted_triples], dtype=float),
+            "ga":    np.array([x[2] for x in sorted_triples], dtype=float),
+        }
+
+print(f"H2H indexi hazır: {len(h2h_history)} çift")
+print(f"Takım-rakip indexi hazır: {len(team_vs_opp)} takım")
+
+
 # ── Rolling form ──────────────────────────────────────────────────────────────
+_EMPTY_FORM = {
+    "points_last_n": np.nan, "goal_diff_last_n": np.nan,
+    "gf_last_n": np.nan, "ga_last_n": np.nan,
+    "weighted_form": np.nan, "matches_played": 0,
+    "win_streak": 0, "loss_streak": 0,
+    "clean_sheet_rate": np.nan, "failed_to_score_rate": np.nan,
+}
+
 def get_rolling_form(team: str, date: pd.Timestamp, n: int = ROLLING_FORM_WINDOW) -> dict:
     if team not in team_history:
-        return {"points_last_n": np.nan, "goal_diff_last_n": np.nan,
-                "gf_last_n": np.nan, "ga_last_n": np.nan,
-                "weighted_form": np.nan, "matches_played": 0}
+        return _EMPTY_FORM.copy()
 
     th = team_history[team]
     ts = np.datetime64(date, "ns")
     end_idx = int(np.searchsorted(th["dates"], ts, side="left"))  # strict past only
 
     if end_idx == 0:
-        return {"points_last_n": np.nan, "goal_diff_last_n": np.nan,
-                "gf_last_n": np.nan, "ga_last_n": np.nan,
-                "weighted_form": np.nan, "matches_played": 0}
+        return _EMPTY_FORM.copy()
 
     start_idx = max(0, end_idx - n)
     pts  = th["pts"][start_idx:end_idx]
@@ -173,13 +239,36 @@ def get_rolling_form(team: str, date: pd.Timestamp, n: int = ROLLING_FORM_WINDOW
     weights /= weights.sum()
     weighted_pts = float((pts * weights).sum() * n)
 
+    # Streak: consecutive wins/losses from the most recent match backward
+    pts_list = pts.tolist()
+    win_streak = 0
+    for p in reversed(pts_list):
+        if p == 3.0:
+            win_streak += 1
+        else:
+            break
+    loss_streak = 0
+    for p in reversed(pts_list):
+        if p == 0.0:
+            loss_streak += 1
+        else:
+            break
+
+    n_m = len(pts)
+    cs_rate  = float((ga == 0).mean()) if n_m > 0 else np.nan
+    fts_rate = float((gf == 0).mean()) if n_m > 0 else np.nan
+
     return {
-        "points_last_n":    float(pts.sum()),
-        "goal_diff_last_n": float((gf - ga).sum()),
-        "gf_last_n":        float(gf.sum()),
-        "ga_last_n":        float(ga.sum()),
-        "weighted_form":    weighted_pts,
-        "matches_played":   len(pts),
+        "points_last_n":        float(pts.sum()),
+        "goal_diff_last_n":     float((gf - ga).sum()),
+        "gf_last_n":            float(gf.sum()),
+        "ga_last_n":            float(ga.sum()),
+        "weighted_form":        weighted_pts,
+        "matches_played":       n_m,
+        "win_streak":           win_streak,
+        "loss_streak":          loss_streak,
+        "clean_sheet_rate":     cs_rate,
+        "failed_to_score_rate": fts_rate,
     }
 
 
@@ -208,6 +297,66 @@ def get_attack_defense(team: str, date: pd.Timestamp, window: int = 20) -> dict:
         "defense_weakness": round(avg_ga / global_avg if global_avg > 0 else 1.0, 4),
         "form_matches":     end_idx - start_idx,
     }
+
+
+# ── H2H goal diff ─────────────────────────────────────────────────────────────
+def get_h2h_goal_diff(home: str, away: str, date: pd.Timestamp, n: int = 5) -> float:
+    """
+    Son n H2H maçta ev sahibi lehine ortalama gol farkı.
+    Veri yoksa 0.0 döner.
+    """
+    key = (min(home, away), max(home, away))
+    if key not in h2h_history:
+        return 0.0
+    ts = np.datetime64(date, "ns")
+    h2h = h2h_history[key]
+    end_idx = int(np.searchsorted(h2h["dates"], ts, side="left"))
+    if end_idx == 0:
+        return 0.0
+    start_idx = max(0, end_idx - n)
+    diffs = h2h["diff"][start_idx:end_idx]
+    # diff is from perspective of min(home,away); flip if home is the larger
+    sign = 1.0 if home <= away else -1.0
+    return float(diffs.mean() * sign)
+
+
+# ── Common opponent score diff ────────────────────────────────────────────────
+def get_common_opponent_diff(
+    home: str, away: str, date: pd.Timestamp, window: int = 20
+) -> float:
+    """
+    Ortak rakiplere karşı son window maçtaki ortalama gol farkı farkı.
+    home_avg_gd(vs commons) - away_avg_gd(vs commons). Yoksa 0.0.
+    """
+    if home not in team_vs_opp or away not in team_vs_opp:
+        return 0.0
+    ts = np.datetime64(date, "ns")
+
+    def _opp_stats(team: str) -> dict[str, float]:
+        """opp → ortalama gol farkı (team - opp), son window maç"""
+        stats: dict[str, float] = {}
+        if team not in team_vs_opp:
+            return stats
+        for opp, data in team_vs_opp[team].items():
+            end_idx = int(np.searchsorted(data["dates"], ts, side="left"))
+            if end_idx == 0:
+                continue
+            s = max(0, end_idx - window)
+            gf = data["gf"][s:end_idx]
+            ga = data["ga"][s:end_idx]
+            stats[opp] = float((gf - ga).mean())
+        return stats
+
+    home_stats = _opp_stats(home)
+    away_stats = _opp_stats(away)
+
+    commons = set(home_stats) & set(away_stats)
+    if not commons:
+        return 0.0
+
+    home_avg = float(np.mean([home_stats[c] for c in commons]))
+    away_avg = float(np.mean([away_stats[c] for c in commons]))
+    return round(home_avg - away_avg, 4)
 
 
 # ── Upset risk ────────────────────────────────────────────────────────────────
@@ -242,7 +391,8 @@ def upset_label(score: float) -> str:
 # ── Tarihi maç feature matrisi ────────────────────────────────────────────────
 print("\nTarihi feature matrisi oluşturuluyor...")
 
-results_modern = results_clean[results_clean["date"] >= "2000-01-01"].reset_index(drop=True)
+# results_clean is already filtered to 2000+
+results_modern = results_clean.reset_index(drop=True)
 print(f"  2000+ maç sayısı: {len(results_modern):,}")
 
 feature_rows = []
@@ -261,8 +411,11 @@ for i, (_, row) in enumerate(results_modern.iterrows()):
     elo_away = fast_elo(away, date)
     elo_diff = elo_home - elo_away if (not np.isnan(elo_home) and not np.isnan(elo_away)) else np.nan
 
-    form_home = get_rolling_form(home, date)
-    form_away = get_rolling_form(away, date)
+    form_home   = get_rolling_form(home, date)
+    form_away   = get_rolling_form(away, date)
+    form_home_5 = get_rolling_form(home, date, n=5)
+    form_away_5 = get_rolling_form(away, date, n=5)
+
     form_diff = (
         form_home["weighted_form"] - form_away["weighted_form"]
         if (not np.isnan(form_home["weighted_form"]) and not np.isnan(form_away["weighted_form"]))
@@ -272,36 +425,59 @@ for i, (_, row) in enumerate(results_modern.iterrows()):
     ad_home = get_attack_defense(home, date)
     ad_away = get_attack_defense(away, date)
 
+    h2h_diff   = get_h2h_goal_diff(home, away, date)
+    co_diff    = get_common_opponent_diff(home, away, date)
+
     hs, as_ = int(row["home_score"]), int(row["away_score"])
     if hs > as_:    result_label = "H"
     elif hs == as_: result_label = "D"
     else:           result_label = "A"
 
     feature_rows.append({
-        "date":               date,
-        "home_team":          home,
-        "away_team":          away,
-        "elo_home":           elo_home,
-        "elo_away":           elo_away,
-        "elo_diff":           elo_diff,
-        "form_home_pts":      form_home["points_last_n"],
-        "form_away_pts":      form_away["points_last_n"],
-        "form_diff":          form_diff,
-        "weighted_form_home": form_home["weighted_form"],
-        "weighted_form_away": form_away["weighted_form"],
-        "gf_home_last_n":     form_home["gf_last_n"],
-        "ga_home_last_n":     form_home["ga_last_n"],
-        "gf_away_last_n":     form_away["gf_last_n"],
-        "ga_away_last_n":     form_away["ga_last_n"],
-        "attack_home":        ad_home["attack_strength"],
-        "defense_home":       ad_home["defense_weakness"],
-        "attack_away":        ad_away["attack_strength"],
-        "defense_away":       ad_away["defense_weakness"],
-        "neutral":            int(row.get("neutral", 0)),
-        "tournament_weight":  get_tournament_weight(row.get("tournament", "")),
-        "home_score":         hs,
-        "away_score":         as_,
-        "result":             result_label,
+        "date":                      date,
+        "home_team":                 home,
+        "away_team":                 away,
+        "elo_home":                  elo_home,
+        "elo_away":                  elo_away,
+        "elo_diff":                  elo_diff,
+        "form_home_pts":             form_home["points_last_n"],
+        "form_away_pts":             form_away["points_last_n"],
+        "form_diff":                 form_diff,
+        "weighted_form_home":        form_home["weighted_form"],
+        "weighted_form_away":        form_away["weighted_form"],
+        "gf_home_last_n":            form_home["gf_last_n"],
+        "ga_home_last_n":            form_home["ga_last_n"],
+        "gf_away_last_n":            form_away["gf_last_n"],
+        "ga_away_last_n":            form_away["ga_last_n"],
+        "attack_home":               ad_home["attack_strength"],
+        "defense_home":              ad_home["defense_weakness"],
+        "attack_away":               ad_away["attack_strength"],
+        "defense_away":              ad_away["defense_weakness"],
+        "neutral":                   int(row.get("neutral", 0)),
+        "tournament_weight":         get_tournament_weight(row.get("tournament", "")),
+        # ── Yeni feature'lar ──
+        "points_last_5_home":        form_home_5["points_last_n"],
+        "points_last_5_away":        form_away_5["points_last_n"],
+        "goal_diff_last_5_home":     form_home_5["goal_diff_last_n"],
+        "goal_diff_last_5_away":     form_away_5["goal_diff_last_n"],
+        "goals_for_last_5_home":     form_home_5["gf_last_n"],
+        "goals_for_last_5_away":     form_away_5["gf_last_n"],
+        "goals_against_last_5_home": form_home_5["ga_last_n"],
+        "goals_against_last_5_away": form_away_5["ga_last_n"],
+        "win_streak_home":           form_home["win_streak"],
+        "win_streak_away":           form_away["win_streak"],
+        "loss_streak_home":          form_home["loss_streak"],
+        "loss_streak_away":          form_away["loss_streak"],
+        "clean_sheet_rate_home":     form_home["clean_sheet_rate"],
+        "clean_sheet_rate_away":     form_away["clean_sheet_rate"],
+        "failed_to_score_rate_home": form_home["failed_to_score_rate"],
+        "failed_to_score_rate_away": form_away["failed_to_score_rate"],
+        "h2h_goal_diff":             h2h_diff,
+        "common_opponent_diff":      co_diff,
+        # ── Hedef ──
+        "home_score":                hs,
+        "away_score":                as_,
+        "result":                    result_label,
     })
 
 features_df = pd.DataFrame(feature_rows)
@@ -321,8 +497,11 @@ for _, row in group_fixtures.iterrows():
     elo_away = fast_elo(away, date)
     elo_diff = elo_home - elo_away if (not np.isnan(elo_home) and not np.isnan(elo_away)) else np.nan
 
-    form_home = get_rolling_form(home, date)
-    form_away = get_rolling_form(away, date)
+    form_home   = get_rolling_form(home, date)
+    form_away   = get_rolling_form(away, date)
+    form_home_5 = get_rolling_form(home, date, n=5)
+    form_away_5 = get_rolling_form(away, date, n=5)
+
     form_diff = (
         form_home["weighted_form"] - form_away["weighted_form"]
         if (not np.isnan(form_home["weighted_form"]) and not np.isnan(form_away["weighted_form"]))
@@ -332,31 +511,53 @@ for _, row in group_fixtures.iterrows():
     ad_home = get_attack_defense(home, date)
     ad_away = get_attack_defense(away, date)
 
+    h2h_diff = get_h2h_goal_diff(home, away, date)
+    co_diff  = get_common_opponent_diff(home, away, date)
+
     future_rows.append({
-        "match_id":           row["match_id"],
-        "group":              row["group"],
-        "date_utc":           date,
-        "venue":              row["venue"],
-        "home_team":          home,
-        "away_team":          away,
-        "elo_home":           elo_home,
-        "elo_away":           elo_away,
-        "elo_diff":           elo_diff,
-        "form_home_pts":      form_home["points_last_n"],
-        "form_away_pts":      form_away["points_last_n"],
-        "form_diff":          form_diff,
-        "weighted_form_home": form_home["weighted_form"],
-        "weighted_form_away": form_away["weighted_form"],
-        "gf_home_last_n":     form_home["gf_last_n"],
-        "ga_home_last_n":     form_home["ga_last_n"],
-        "gf_away_last_n":     form_away["gf_last_n"],
-        "ga_away_last_n":     form_away["ga_last_n"],
-        "attack_home":        ad_home["attack_strength"],
-        "defense_home":       ad_home["defense_weakness"],
-        "attack_away":        ad_away["attack_strength"],
-        "defense_away":       ad_away["defense_weakness"],
-        "neutral":            1,
-        "tournament_weight":  4.0,
+        "match_id":                  row["match_id"],
+        "group":                     row["group"],
+        "date_utc":                  date,
+        "venue":                     row["venue"],
+        "home_team":                 home,
+        "away_team":                 away,
+        "elo_home":                  elo_home,
+        "elo_away":                  elo_away,
+        "elo_diff":                  elo_diff,
+        "form_home_pts":             form_home["points_last_n"],
+        "form_away_pts":             form_away["points_last_n"],
+        "form_diff":                 form_diff,
+        "weighted_form_home":        form_home["weighted_form"],
+        "weighted_form_away":        form_away["weighted_form"],
+        "gf_home_last_n":            form_home["gf_last_n"],
+        "ga_home_last_n":            form_home["ga_last_n"],
+        "gf_away_last_n":            form_away["gf_last_n"],
+        "ga_away_last_n":            form_away["ga_last_n"],
+        "attack_home":               ad_home["attack_strength"],
+        "defense_home":              ad_home["defense_weakness"],
+        "attack_away":               ad_away["attack_strength"],
+        "defense_away":              ad_away["defense_weakness"],
+        "neutral":                   1,
+        "tournament_weight":         4.0,
+        # ── Yeni feature'lar ──
+        "points_last_5_home":        form_home_5["points_last_n"],
+        "points_last_5_away":        form_away_5["points_last_n"],
+        "goal_diff_last_5_home":     form_home_5["goal_diff_last_n"],
+        "goal_diff_last_5_away":     form_away_5["goal_diff_last_n"],
+        "goals_for_last_5_home":     form_home_5["gf_last_n"],
+        "goals_for_last_5_away":     form_away_5["gf_last_n"],
+        "goals_against_last_5_home": form_home_5["ga_last_n"],
+        "goals_against_last_5_away": form_away_5["ga_last_n"],
+        "win_streak_home":           form_home["win_streak"],
+        "win_streak_away":           form_away["win_streak"],
+        "loss_streak_home":          form_home["loss_streak"],
+        "loss_streak_away":          form_away["loss_streak"],
+        "clean_sheet_rate_home":     form_home["clean_sheet_rate"],
+        "clean_sheet_rate_away":     form_away["clean_sheet_rate"],
+        "failed_to_score_rate_home": form_home["failed_to_score_rate"],
+        "failed_to_score_rate_away": form_away["failed_to_score_rate"],
+        "h2h_goal_diff":             h2h_diff,
+        "common_opponent_diff":      co_diff,
     })
 
 future_df = pd.DataFrame(future_rows)
@@ -396,7 +597,12 @@ vc = features_df["result"].value_counts()
 for label, count in vc.items():
     print(f"  {label}: {count:>6,}  ({count/len(features_df)*100:.1f}%)")
 
-print("\nEksik değer oranları:")
-for c in ["elo_diff", "form_diff", "attack_home", "defense_home", "attack_away", "defense_away"]:
-    pct = features_df[c].isna().mean() * 100
-    print(f"  {c:<25}: {pct:.1f}%")
+print(f"\nYeni feature sütunları ({len(features_df.columns)} toplam):")
+new_cols = [
+    "points_last_5_home", "goal_diff_last_5_home", "win_streak_home",
+    "loss_streak_home", "clean_sheet_rate_home", "failed_to_score_rate_home",
+    "h2h_goal_diff", "common_opponent_diff",
+]
+for c in new_cols:
+    pct_nan = features_df[c].isna().mean() * 100
+    print(f"  {c:<35}: {pct_nan:.1f}% NaN")

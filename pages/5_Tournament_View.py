@@ -37,6 +37,7 @@ from group_standings import (
 )
 from knockout import fill_slots, fill_slots_predicted
 from prediction_engine import get_knockout_prediction
+from utils import fmt_date, team_display, clamp_pct
 
 # ── Sayfa yapılandırması ──────────────────────────────────────────────────────
 st.set_page_config(page_title="Turnuva Görünümü", page_icon="🌍", layout="wide")
@@ -129,7 +130,9 @@ def _show_bracket(ko_df: pd.DataFrame, use_pred_winner: bool = False) -> None:
             if not tbd_h and not tbd_a:
                 try:
                     kp = get_knockout_prediction(rh, ra, elo_map, neutral=True)
-                    prob_str = f"{kp['p_home']:.0%} — {kp['p_away']:.0%}"
+                    ph = clamp_pct(kp["p_home"])
+                    pa = clamp_pct(kp["p_away"])
+                    prob_str = f"{ph:.0%} — {pa:.0%}"
                 except Exception:
                     prob_str = "—"
             else:
@@ -138,7 +141,6 @@ def _show_bracket(ko_df: pd.DataFrame, use_pred_winner: bool = False) -> None:
             if use_pred_winner:
                 winner_str = str(m.get("pred_winner", "")) or "—"
             else:
-                # Gerçek sonuçtan bul
                 if mid in update_dict:
                     hs, as_ = update_dict[mid]
                     if hs > as_:
@@ -152,9 +154,9 @@ def _show_bracket(ko_df: pd.DataFrame, use_pred_winner: bool = False) -> None:
 
             row = st.columns([0.5, 3, 0.5, 3, 2, 2])
             row[0].markdown(f"**{mid}**")
-            row[1].markdown(f"*{rh}*" if tbd_h else rh)
+            row[1].markdown(team_display(rh) if tbd_h else rh)
             row[2].markdown("vs")
-            row[3].markdown(f"*{ra}*" if tbd_a else ra)
+            row[3].markdown(team_display(ra) if tbd_a else ra)
             row[4].markdown(prob_str)
             row[5].markdown(winner_str)
         st.markdown("---")
@@ -280,16 +282,11 @@ with tab_live:
             live_view = live_view[live_view["group"] == live_grp_sel]
 
         for _, fmatch in live_view.iterrows():
-            fmid  = int(fmatch["match_id"])
-            fhome = str(fmatch["home_team"])
-            faway = str(fmatch["away_team"])
+            fmid   = int(fmatch["match_id"])
+            fhome  = str(fmatch["home_team"])
+            faway  = str(fmatch["away_team"])
             played = fmid in update_dict
-
-            # Tarih
-            try:
-                fdate = pd.to_datetime(fmatch["date_utc"]).strftime("%d %b %H:%M")
-            except Exception:
-                fdate = str(fmatch.get("date_utc", ""))
+            fdate  = fmt_date(fmatch.get("date_utc", ""))
 
             c1, c2, c3, c4, c5, c6, c7 = st.columns([0.5, 2.5, 1, 0.5, 1, 2.5, 1.5])
             with c1:
@@ -299,8 +296,7 @@ with tab_live:
             with c3:
                 default_h = update_dict[fmid][0] if played else 0
                 h_val = st.number_input(
-                    "Ev",
-                    min_value=0, max_value=20,
+                    fhome, min_value=0, max_value=20,
                     value=default_h,
                     key=f"live_h_{fmid}",
                     label_visibility="collapsed",
@@ -310,8 +306,7 @@ with tab_live:
             with c5:
                 default_a = update_dict[fmid][1] if played else 0
                 a_val = st.number_input(
-                    "Dep",
-                    min_value=0, max_value=20,
+                    faway, min_value=0, max_value=20,
                     value=default_a,
                     key=f"live_a_{fmid}",
                     label_visibility="collapsed",

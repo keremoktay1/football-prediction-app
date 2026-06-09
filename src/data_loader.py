@@ -114,13 +114,63 @@ def delete_match_update(match_id: int) -> None:
 # Fikstür dosyaları
 # ──────────────────────────────────────────────
 
+PLAYOFF_OVERRIDES_PATH = os.path.join(PROCESSED_DIR, "playoff_overrides.csv")
+
+
+def load_playoff_overrides() -> dict:
+    """
+    playoff_overrides.csv → {slot_name: actual_team} dict.
+    Boş actual_team değerleri dahil edilmez.
+    """
+    if not os.path.exists(PLAYOFF_OVERRIDES_PATH):
+        return {}
+    try:
+        df = pd.read_csv(PLAYOFF_OVERRIDES_PATH, dtype=str)
+        result = {}
+        for _, row in df.iterrows():
+            slot = str(row.get("slot_name", "")).strip()
+            team = str(row.get("actual_team", "")).strip()
+            if slot and team and team.lower() not in ("", "nan", "none"):
+                result[slot] = team
+        return result
+    except Exception:
+        return {}
+
+
+def save_playoff_override(slot_name: str, actual_team: str) -> None:
+    """playoff_overrides.csv'de slot_name için actual_team değerini günceller."""
+    SLOTS = [
+        "UEFA Playoff A", "UEFA Playoff B", "UEFA Playoff C", "UEFA Playoff D",
+        "FIFA Playoff 1", "FIFA Playoff 2",
+    ]
+    overrides = {}
+    if os.path.exists(PLAYOFF_OVERRIDES_PATH):
+        try:
+            df = pd.read_csv(PLAYOFF_OVERRIDES_PATH, dtype=str)
+            for _, row in df.iterrows():
+                s = str(row.get("slot_name", "")).strip()
+                t = str(row.get("actual_team", "")).strip()
+                if s:
+                    overrides[s] = t if t.lower() not in ("nan", "none") else ""
+        except Exception:
+            pass
+    overrides[slot_name] = actual_team
+    rows = [{"slot_name": s, "actual_team": overrides.get(s, "")} for s in SLOTS]
+    pd.DataFrame(rows).to_csv(PLAYOFF_OVERRIDES_PATH, index=False)
+
+
 def load_fixtures() -> Optional[pd.DataFrame]:
-    """GROUP_FIXTURES.CSV yükler."""
+    """GROUP_FIXTURES.CSV yükler; playoff_overrides.csv varsa takım adlarını günceller."""
     path = FILES["group_fixtures"]
     if not os.path.exists(path):
         return None
     try:
-        return pd.read_csv(path)
+        df = pd.read_csv(path)
+        overrides = load_playoff_overrides()
+        if overrides:
+            df["home_team"] = df["home_team"].replace(overrides)
+            df["away_team"] = df["away_team"].replace(overrides)
+        return df
     except Exception:
         return None
 

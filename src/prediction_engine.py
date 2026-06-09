@@ -31,6 +31,25 @@ FEATURE_COLS = [
     "defense_away",
     "neutral",
     "tournament_weight",
+    # ── Yeni feature'lar ──
+    "points_last_5_home",
+    "points_last_5_away",
+    "goal_diff_last_5_home",
+    "goal_diff_last_5_away",
+    "goals_for_last_5_home",
+    "goals_for_last_5_away",
+    "goals_against_last_5_home",
+    "goals_against_last_5_away",
+    "win_streak_home",
+    "win_streak_away",
+    "loss_streak_home",
+    "loss_streak_away",
+    "clean_sheet_rate_home",
+    "clean_sheet_rate_away",
+    "failed_to_score_rate_home",
+    "failed_to_score_rate_away",
+    "h2h_goal_diff",
+    "common_opponent_diff",
 ]
 
 POISSON_FEATURES = [
