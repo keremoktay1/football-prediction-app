@@ -182,6 +182,82 @@ def calculate_standings(
     return result
 
 
+def calculate_deterministic_standings(
+    fixtures: pd.DataFrame,
+    outcomes: Dict[int, str],
+    goal_map: Optional[Dict[int, tuple]] = None,
+) -> Dict[str, pd.DataFrame]:
+    """
+    Her maç için verilen H/D/A sonucundan grup puan tablolarını hesaplar.
+    Model-predicted veya gerçek sonuçlar için kullanılır.
+
+    Parameters
+    ----------
+    fixtures  : GROUP_FIXTURES.CSV DataFrame
+    outcomes  : {match_id: "H"|"D"|"A"}
+    goal_map  : {match_id: (home_goals, away_goals)} — yoksa 1-0/1-1/0-1 kullanılır
+
+    Returns
+    -------
+    dict: group_label -> sıralı puan tablosu DataFrame
+    """
+    STANDARD_GOALS: Dict[str, tuple] = {"H": (1, 0), "D": (1, 1), "A": (0, 1)}
+
+    groups: Dict[str, Dict[str, dict]] = {}
+
+    for _, match in fixtures.iterrows():
+        grp  = str(match["group"])
+        mid  = int(match["match_id"])
+        home = str(match["home_team"])
+        away = str(match["away_team"])
+
+        if grp not in groups:
+            groups[grp] = {}
+        if home not in groups[grp]:
+            groups[grp][home] = _empty_team_record()
+        if away not in groups[grp]:
+            groups[grp][away] = _empty_team_record()
+
+        if mid not in outcomes:
+            continue
+
+        outcome = outcomes[mid]
+        if goal_map and mid in goal_map:
+            hs, as_ = int(goal_map[mid][0]), int(goal_map[mid][1])
+        else:
+            hs, as_ = STANDARD_GOALS.get(outcome, (1, 0))
+
+        hp, ap = _outcome_points(hs, as_)
+
+        for team, gf, ga, pts in [(home, hs, as_, hp), (away, as_, hs, ap)]:
+            rec = groups[grp][team]
+            rec["P"]  += 1
+            rec["GF"] += gf
+            rec["GA"] += ga
+            rec["GD"] += gf - ga
+            rec["Pts"] += pts
+            if pts == 3:   rec["W"] += 1
+            elif pts == 1: rec["D"] += 1
+            else:          rec["L"] += 1
+
+    result: Dict[str, pd.DataFrame] = {}
+    for grp, teams in sorted(groups.items()):
+        rows = [{"Team": t, **{k: v for k, v in s.items() if k != "xPts"},
+                 "xPts": 0.0, "TotalPts": float(s["Pts"])}
+                for t, s in teams.items()]
+        df = pd.DataFrame(rows).sort_values(
+            ["TotalPts", "Pts", "GD", "GF"], ascending=False
+        ).reset_index(drop=True)
+        df.index = range(1, len(df) + 1)
+        df["Status"] = ""
+        if len(df) >= 1: df.at[1, "Status"] = "W"
+        if len(df) >= 2: df.at[2, "Status"] = "RU"
+        if len(df) >= 3: df.at[3, "Status"] = "3rd"
+        result[grp] = df
+
+    return result
+
+
 def is_group_complete(group_label: str, fixtures: pd.DataFrame, updates: pd.DataFrame) -> bool:
     """
     Grubun tüm maçları oynandıysa True döner.

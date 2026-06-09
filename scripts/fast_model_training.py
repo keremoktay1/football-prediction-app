@@ -459,4 +459,65 @@ pred_path   = os.path.join(PROCESSED_DIR, "predictions_latest.csv")
 predictions.to_csv(pred_path, index=False)
 print(f"\n  ✅  predictions_latest.csv → {len(predictions)} maç, {len(predictions.columns)} kolon")
 
+# ── Per-model 2026 tahminleri ─────────────────────────────────────────────────
+print("\n[9] Per-model 2026 tahminleri kaydediliyor...")
+
+all_model_rows = []
+
+base_cols = ["match_id", "group", "home_team", "away_team"]
+
+def _add_model_rows(name, prob_arr, lh_arr=None, la_arr=None):
+    for i, (_, row) in enumerate(future.iterrows()):
+        ph, pd_, pa = float(prob_arr[i, 0]), float(prob_arr[i, 1]), float(prob_arr[i, 2])
+        all_model_rows.append({
+            "match_id":   int(row["match_id"]),
+            "group":      row.get("group", ""),
+            "home_team":  row["home_team"],
+            "away_team":  row["away_team"],
+            "model":      name,
+            "p_home":     round(ph, 4),
+            "p_draw":     round(pd_, 4),
+            "p_away":     round(pa, 4),
+            "lambda_home": round(float(lh_arr[i]), 3) if lh_arr is not None else None,
+            "lambda_away": round(float(la_arr[i]), 3) if la_arr is not None else None,
+        })
+
+# Elo Baseline
+elo_future_prob = elo_prob_matrix(X_future)
+_add_model_rows("Elo Baseline", elo_future_prob)
+
+# LR
+_add_model_rows("LR", lr_model.predict_proba(X_future_t))
+
+# Poisson — extract lambda arrays from already computed poisson_df
+_lh = future["lambda_home"].values if "lambda_home" in future.columns else None
+_la = future["lambda_away"].values if "lambda_away" in future.columns else None
+poi_future = np.column_stack([
+    future["p_home_poi"].values,
+    future["p_draw_poi"].values,
+    future["p_away_poi"].values,
+])
+_add_model_rows("Poisson", poi_future, _lh, _la)
+
+# Ensemble
+ens_future = np.column_stack([
+    future["p_home"].values,
+    future["p_draw"].values,
+    future["p_away"].values,
+])
+_add_model_rows("Ensemble", ens_future, _lh, _la)
+
+# Random Forest
+_add_model_rows("Random Forest", rf_model.predict_proba(X_future_t))
+
+# XGBoost
+if HAS_XGB:
+    _add_model_rows("XGBoost", xgb_model.predict_proba(X_future_t))
+
+all_models_df = pd.DataFrame(all_model_rows)
+all_models_path = os.path.join(PROCESSED_DIR, "predictions_all_models.csv")
+all_models_df.to_csv(all_models_path, index=False)
+print(f"  ✅  predictions_all_models.csv → {len(all_models_df)} satır "
+      f"({all_models_df['model'].nunique()} model × {len(future)} maç)")
+
 print("\nTüm dosyalar hazır ✅")

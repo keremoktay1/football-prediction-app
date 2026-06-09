@@ -138,6 +138,106 @@ def fill_slots(
     return df
 
 
+def fill_slots_predicted(
+    knockout_slots: pd.DataFrame,
+    standings: dict,
+    best_third: Optional[pd.DataFrame],
+    elo_map: dict,
+) -> pd.DataFrame:
+    """
+    Model tahmini için tüm knockout slotlarını deterministik olarak doldurur.
+    Grup slotları standings'den, eleme slotları Elo tahminiyle belirlenir.
+
+    Returns
+    -------
+    knockout_slots kopyası; 'resolved_home', 'resolved_away', 'pred_winner' sütunları ekli.
+    """
+    from prediction_engine import get_knockout_prediction  # noqa: local import
+
+    df = knockout_slots.copy()
+    df["resolved_home"] = df["slot_home"].astype(str)
+    df["resolved_away"] = df["slot_away"].astype(str)
+    df["pred_winner"]   = ""
+
+    round_order = {
+        "Round of 32": 1, "Round of 16": 2, "Quarter-final": 3,
+        "Semi-final": 4, "Third-place playoff": 5, "Final": 6,
+    }
+    df["_ro"] = df["round"].map(round_order).fillna(99)
+
+    # ── Grup slotlarını çöz
+    def resolve_group(slot: str) -> str:
+        m = re.match(r"(Winner|Runner-up)\s+Group\s+([A-Za-z])", slot)
+        if not m:
+            return slot
+        role, grp = m.group(1), m.group(2).upper()
+        if grp not in standings:
+            return slot
+        gdf = standings[grp]
+        if role == "Winner"    and len(gdf) >= 1: return str(gdf.iloc[0]["Team"])
+        if role == "Runner-up" and len(gdf) >= 2: return str(gdf.iloc[1]["Team"])
+        return slot
+
+    for idx in df.index:
+        df.at[idx, "resolved_home"] = resolve_group(df.at[idx, "resolved_home"])
+        df.at[idx, "resolved_away"] = resolve_group(df.at[idx, "resolved_away"])
+
+    # ── Best 3rd slotları
+    bt_teams: list = []
+    if best_third is not None and not best_third.empty and "Team" in best_third.columns:
+        bt_teams = list(best_third["Team"].astype(str).values)
+    bt_cursor = [0]
+    for idx in df.index:
+        for col in ("resolved_home", "resolved_away"):
+            if str(df.at[idx, col]).startswith("Best 3rd"):
+                if bt_cursor[0] < len(bt_teams):
+                    df.at[idx, col] = bt_teams[bt_cursor[0]]
+                    bt_cursor[0] += 1
+
+    # ── Eleme turlarını sırayla çöz (R32 → R16 → QF → SF → 3rd/Final)
+    pred_winners: Dict[int, str] = {}   # match_id → winner team
+
+    for _ in range(6):  # Her geçişte en az bir tur çözülür
+        df_sorted = df.sort_values("_ro")
+        for idx, match in df_sorted.iterrows():
+            mid = int(match["match_id"])
+
+            # "Winner Match X" / "Loser Match X" slotlarını çöz
+            for col in ("resolved_home", "resolved_away"):
+                val = str(df.at[idx, col])
+                m = re.match(r"(Winner|Loser)\s+Match\s+(\d+)", val)
+                if not m:
+                    continue
+                role, prev_mid = m.group(1), int(m.group(2))
+                if role == "Winner" and prev_mid in pred_winners:
+                    df.at[idx, col] = pred_winners[prev_mid]
+                elif role == "Loser":
+                    # Loser = the other team from that match
+                    prev_row = df[df["match_id"] == prev_mid]
+                    if not prev_row.empty and prev_mid in pred_winners:
+                        winner = pred_winners[prev_mid]
+                        both = {str(prev_row.iloc[0]["resolved_home"]),
+                                str(prev_row.iloc[0]["resolved_away"])}
+                        losers = both - {winner}
+                        if losers:
+                            df.at[idx, col] = losers.pop()
+
+            # Eğer bu maç henüz kazanan atanmamışsa ve her iki takım biliniyorsa → tahmin et
+            if mid in pred_winners:
+                continue
+            rh = str(df.at[idx, "resolved_home"])
+            ra = str(df.at[idx, "resolved_away"])
+            tbd = rh.startswith(("Winner", "Runner", "Best", "Loser")) or \
+                  ra.startswith(("Winner", "Runner", "Best", "Loser"))
+            if not tbd:
+                kp = get_knockout_prediction(rh, ra, elo_map, neutral=True)
+                pred_winners[mid] = rh if kp["p_home"] >= kp["p_away"] else ra
+                df.at[idx, "pred_winner"] = pred_winners[mid]
+
+    df.drop(columns=["_ro"], inplace=True)
+    return df
+
+
 def get_match_result_teams(
     match_id: int,
     knockout_slots_resolved: pd.DataFrame,

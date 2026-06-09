@@ -263,3 +263,14 @@ def build_elo_map(elo_df: Optional[pd.DataFrame] = None) -> dict:
         for _, row in elo_df.iterrows():
             elo_map[str(row["country"])] = float(row["rating"])
     return elo_map
+
+
+def load_per_model_predictions() -> Optional[pd.DataFrame]:
+    """predictions_all_models.csv yükler (6 model × 72 maç = 432 satır)."""
+    path = os.path.join(PROCESSED_DIR, "predictions_all_models.csv")
+    if not os.path.exists(path):
+        return None
+    try:
+        return pd.read_csv(path)
+    except Exception:
+        return None
