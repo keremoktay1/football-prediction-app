@@ -243,6 +243,43 @@ with tab_pred:
                     pct_df[c] = (pct_df[c] * 100).round(1).astype(str) + "%"
             outcome_map = {"H": "🏠 Ev", "D": "🤝 Berabere", "A": "✈️ Dep"}
             pct_df["outcome"] = pct_df["outcome"].map(outcome_map).fillna(pct_df["outcome"])
+
+            # xG sütunları — predictions_latest.csv'den al
+            if predictions is not None:
+                _xg_src_cols = [c for c in ["match_id", "lambda_home", "lambda_away", "over_2_5", "top_scorelines"]
+                                if c in predictions.columns]
+                if len(_xg_src_cols) > 1:
+                    import ast as _ast
+                    _xg_df = predictions[_xg_src_cols].copy()
+                    pct_df = pct_df.merge(_xg_df, on="match_id", how="left")
+
+                    if "lambda_home" in pct_df.columns:
+                        pct_df["xG Ev"] = pct_df["lambda_home"].apply(
+                            lambda x: f"{float(x):.1f}" if pd.notna(x) else "—"
+                        )
+                    if "lambda_away" in pct_df.columns:
+                        pct_df["xG Dep"] = pct_df["lambda_away"].apply(
+                            lambda x: f"{float(x):.1f}" if pd.notna(x) else "—"
+                        )
+                    if "over_2_5" in pct_df.columns:
+                        pct_df["Üst 2.5"] = pct_df["over_2_5"].apply(
+                            lambda x: f"%{float(x)*100:.0f}" if pd.notna(x) else "—"
+                        )
+                    if "top_scorelines" in pct_df.columns:
+                        def _parse_top(s):
+                            try:
+                                lst = _ast.literal_eval(str(s))
+                                if lst:
+                                    _h, _a, _p = lst[0]
+                                    return f"{_h}-{_a} (%{_p*100:.0f})"
+                            except Exception:
+                                pass
+                            return "—"
+                        pct_df["En Olası Skor"] = pct_df["top_scorelines"].apply(_parse_top)
+
+                    pct_df = pct_df.drop(columns=[c for c in ["lambda_home", "lambda_away", "over_2_5", "top_scorelines"]
+                                                   if c in pct_df.columns])
+
             pct_df = pct_df.sort_values(["group", "match_id"])
             st.dataframe(pct_df, use_container_width=True, hide_index=True)
 

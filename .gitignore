@@ -1,30 +1,7 @@
 __pycache__/
 *.pyc
 *.pyo
-*.pyd
-.Python
-*.egg-info/
-.eggs/
-dist/
-build/
-.env
-.venv
-venv/
 .DS_Store
-*.log
-
-# Büyük ham veri dosyaları (git LFS veya harici)
-data/raw/
-# Eğitimle üretilen modeller (scripts/ ile yeniden üretilir)
-models/
-# Yürütülmüş notebook çıktıları
-notebooks/*_executed.ipynb
-# Streamlit önbellek
-.streamlit/
-
-# Conda artık dosyaları
-=1.11
-=1.3
-=1.35
-=2.0
-=5.18
+=*
+.streamlit/secrets.toml
+notebooks/.ipynb_checkpoints/

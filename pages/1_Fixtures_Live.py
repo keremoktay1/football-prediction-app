@@ -62,7 +62,8 @@ if updates is not None and not updates.empty:
 
 # ── Tahminleri birleştir ─────────────────────────────────────────────────────
 if predictions is not None:
-    pred_cols = ["match_id"] + [c for c in ("p_home", "p_draw", "p_away") if c in predictions.columns]
+    _xg_cols = ("p_home", "p_draw", "p_away", "lambda_home", "lambda_away", "over_2_5", "btts", "top_scorelines")
+    pred_cols = ["match_id"] + [c for c in _xg_cols if c in predictions.columns]
     merged = fixtures.merge(predictions[pred_cols], on="match_id", how="left")
 else:
     merged = fixtures.copy()
@@ -106,8 +107,8 @@ if show_standings:
     st.markdown("---")
 
 # ── Tablo başlığı ─────────────────────────────────────────────────────────────
-hdr = st.columns([0.4, 0.5, 2.2, 2.2, 2.5, 1.8, 1.3, 0.7])
-for col, txt in zip(hdr, ["", "Grp", "Ev Sahibi", "Deplasman", "H% / B% / D%", "Favori", "Skor", "GF"]):
+hdr = st.columns([0.4, 0.5, 2.0, 2.0, 2.2, 1.6, 1.5, 1.2, 0.6])
+for col, txt in zip(hdr, ["", "Grp", "Ev Sahibi", "Deplasman", "H% / B% / D%", "Bek. Skor", "Favori", "Skor", "GF"]):
     col.markdown(f"**{txt}**")
 st.markdown("---")
 
@@ -153,16 +154,47 @@ for _, match in view_df.iterrows():
 
     date_disp = fmt_date(match.get("date_utc", ""))
 
+    # xG (Beklenen Skor) hesapla
+    try:
+        lh = match.get("lambda_home")
+        la = match.get("lambda_away")
+        if pd.notna(lh) and pd.notna(la):
+            xg_main = f"**{float(lh):.1f} – {float(la):.1f}**"
+            o25 = match.get("over_2_5")
+            btts_v = match.get("btts")
+            xg_sub  = f"Ü:{float(o25)*100:.0f}%  BT:{float(btts_v)*100:.0f}%" if (pd.notna(o25) and pd.notna(btts_v)) else ""
+            # En olası skor
+            top_s = match.get("top_scorelines")
+            if pd.notna(top_s):
+                import ast
+                try:
+                    lst = ast.literal_eval(str(top_s))
+                    if lst:
+                        _h, _a, _p = lst[0]
+                        xg_sub += f"  {_h}-{_a}(%{_p*100:.0f})"
+                except Exception:
+                    pass
+        else:
+            xg_main = "—"
+            xg_sub  = ""
+    except Exception:
+        xg_main = "—"
+        xg_sub  = ""
+
     # ── Satır 1: maç bilgisi ──────────────────────────────────────────────
-    row = st.columns([0.4, 0.5, 2.2, 2.2, 2.5, 1.8, 1.3, 0.7])
+    row = st.columns([0.4, 0.5, 2.0, 2.0, 2.2, 1.6, 1.5, 1.2, 0.6])
     row[0].markdown(badge)
     row[1].markdown(f"**{grp}**")
     row[2].markdown(f"**{home}** ✓" if (has_result and actual_key == "H") else home)
     row[3].markdown(f"**{away}** ✓" if (has_result and actual_key == "A") else away)
     row[4].markdown(prob_str)
-    row[5].markdown(f"**{fav_label}**")
-    row[6].markdown(score_str)
-    row[7].markdown(gf_str)
+    with row[5]:
+        st.markdown(xg_main)
+        if xg_sub:
+            st.caption(xg_sub)
+    row[6].markdown(f"**{fav_label}**")
+    row[7].markdown(score_str)
+    row[8].markdown(gf_str)
 
     # ── Satır 2: inline skor girişi ───────────────────────────────────────
     edit_key = f"edit_{mid}"

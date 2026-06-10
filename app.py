@@ -2,8 +2,10 @@
 app.py — FIFA 2026 Tahmin Platformu ana Streamlit girişi.
 """
 import os
+import subprocess
 import sys
 
+import pandas as pd
 import streamlit as st
 
 # src/ modüllerini yola ekle
@@ -59,6 +61,47 @@ with st.sidebar.expander("🏟️ Playoff Takımları", expanded=False):
             save_playoff_override(_slot, _val.strip())
         st.success("Playoff isimleri güncellendi!")
         st.rerun()
+
+st.sidebar.markdown("---")
+
+# ── Model Yeniden Eğitim ──────────────────────────────────────────────────────
+_updates_for_btn = None
+try:
+    _updates_for_btn = load_match_updates()
+except Exception:
+    pass
+
+_has_updates = (
+    _updates_for_btn is not None
+    and not _updates_for_btn.empty
+    and len(_updates_for_btn) > 0
+)
+
+if _has_updates:
+    st.sidebar.markdown(f"**{len(_updates_for_btn)} skor girildi** — model güncellenebilir")
+    if st.sidebar.button("🔄 Modeli Yeniden Eğit", key="retrain_btn"):
+        _script = os.path.join(APP_DIR, "scripts", "fast_model_training.py")
+        with st.sidebar.spinner("Model eğitiliyor..."):
+            _result = subprocess.run(
+                [sys.executable, _script],
+                capture_output=True, text=True, cwd=APP_DIR,
+            )
+        if _result.returncode == 0:
+            st.sidebar.success("✅ Model yeniden eğitildi!")
+            try:
+                _comp_path = os.path.join(APP_DIR, "data", "processed", "model_comparison.csv")
+                _comp = pd.read_csv(_comp_path)
+                _row = _comp[(_comp["model"] == "Ensemble") & (_comp["split"] == "test")]
+                if not _row.empty:
+                    _acc = float(_row.iloc[0]["accuracy"]) * 100
+                    st.sidebar.info(f"Ensemble doğruluğu: **{_acc:.1f}%**")
+            except Exception:
+                pass
+            st.rerun()
+        else:
+            st.sidebar.error(f"❌ Eğitim hatası:\n```\n{_result.stderr[-600:]}\n```")
+else:
+    st.sidebar.caption("💡 Skor girin → model yeniden eğitilebilir")
 
 st.sidebar.markdown("---")
 

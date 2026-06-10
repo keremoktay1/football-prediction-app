@@ -213,6 +213,39 @@ print(f"\n  Train : {len(train):>6,}  (2000 → 2017)")
 print(f"  Valid : {len(valid):>6,}  (2018 → 2021)")
 print(f"  Test  : {len(test):>6,}  (2022 → bugün)")
 
+# ── 2026 WC match_updates — yüksek ağırlıklı yeniden eğitim ──────────────────
+train_weights = train["tournament_weight"].fillna(1.0).values.copy().astype(float)
+
+updates_path = os.path.join(PROCESSED_DIR, "match_updates.csv")
+if os.path.isfile(updates_path):
+    _updates_df = pd.read_csv(updates_path)
+    if not _updates_df.empty:
+        _future_feats = future[["match_id"] + FEATURE_COLS].copy()
+        _wc2026 = _updates_df.merge(_future_feats, on="match_id", how="inner")
+        if not _wc2026.empty:
+            _wc2026 = _wc2026.copy()
+            _wc2026["home_score"] = _wc2026["home_score"].astype(int)
+            _wc2026["away_score"] = _wc2026["away_score"].astype(int)
+
+            def _derive_result(r):
+                if r["home_score"] > r["away_score"]: return "H"
+                elif r["home_score"] == r["away_score"]: return "D"
+                else: return "A"
+
+            _wc2026["result"] = _wc2026.apply(_derive_result, axis=1)
+            _wc2026["target"] = _wc2026["result"].map(LABEL_MAP)
+            _wc2026["date"]   = pd.Timestamp("2026-06-01")
+
+            train = pd.concat([train, _wc2026], ignore_index=True)
+            train_weights = np.concatenate([train_weights, np.full(len(_wc2026), 20.0)])
+            print(f"\n  ✅  {len(_wc2026)} adet 2026 WC maçı eğitime eklendi (ağırlık=20.0)")
+        else:
+            print("\n  ℹ️  match_updates.csv var ama özellik eşleşmesi bulunamadı.")
+    else:
+        print("\n  ℹ️  match_updates.csv boş — standart eğitim.")
+else:
+    print("\n  ℹ️  match_updates.csv bulunamadı — standart eğitim.")
+
 X_train = train[FEATURE_COLS].copy()
 y_train = train["target"].values
 X_valid = valid[FEATURE_COLS].copy()
@@ -245,7 +278,7 @@ lr_model = LogisticRegression(
     multi_class="multinomial", solver="lbfgs",
     max_iter=500, C=1.0, class_weight="balanced", random_state=42,
 )
-lr_model.fit(X_train_t, y_train)
+lr_model.fit(X_train_t, y_train, sample_weight=train_weights)
 lr_valid_prob = lr_model.predict_proba(X_valid_t)
 lr_test_prob  = lr_model.predict_proba(X_test_t)
 print(f"  Valid LL: {log_loss(y_valid, lr_valid_prob, labels=[0,1,2]):.4f}  "
@@ -274,9 +307,9 @@ X_p_valid_away = scaler_p.transform(imputer_p.transform(valid_away.values))
 X_p_test_away  = scaler_p.transform(imputer_p.transform(test_away.values))
 
 home_goal_model = Ridge(alpha=1.0)
-home_goal_model.fit(X_p_train_home, train["home_score"].clip(0, 8))
+home_goal_model.fit(X_p_train_home, train["home_score"].clip(0, 8), sample_weight=train_weights)
 away_goal_model = Ridge(alpha=1.0)
-away_goal_model.fit(X_p_train_away, train["away_score"].clip(0, 8))
+away_goal_model.fit(X_p_train_away, train["away_score"].clip(0, 8), sample_weight=train_weights)
 
 def poisson_prob_matrix(lh_arr: np.ndarray, la_arr: np.ndarray) -> np.ndarray:
     """Toplu Poisson olasılık matrisi — (N, 3)."""
@@ -321,7 +354,7 @@ rf_model = RandomForestClassifier(
     n_estimators=300, max_depth=8, min_samples_leaf=20,
     class_weight="balanced", random_state=42, n_jobs=-1,
 )
-rf_model.fit(X_train_t, y_train)
+rf_model.fit(X_train_t, y_train, sample_weight=train_weights)
 rf_valid_prob = rf_model.predict_proba(X_valid_t)
 rf_test_prob  = rf_model.predict_proba(X_test_t)
 print(f"  Valid LL: {log_loss(y_valid, rf_valid_prob, labels=[0,1,2]):.4f}  "
@@ -341,6 +374,7 @@ if HAS_XGB:
     )
     xgb_model.fit(
         X_train_t, y_train,
+        sample_weight=train_weights,
         eval_set=[(X_valid_t, y_valid)],
         verbose=False,
     )
