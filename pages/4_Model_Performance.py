@@ -163,8 +163,8 @@ else:
             yaxis_gridcolor="#333",
         )
         st.plotly_chart(fig2, use_container_width=True)
-    except Exception:
-        pass
+    except Exception as exc:
+        st.warning(f"Karşılaştırma grafiği oluşturulamadı: {exc}")
 
 st.markdown("---")
 

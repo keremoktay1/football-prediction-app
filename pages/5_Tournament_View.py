@@ -272,7 +272,6 @@ with tab_live:
 
     if fixtures is not None:
         live_groups = sorted(fixtures["group"].unique())
-        gcols_nav = st.columns(min(len(live_groups), 12))
         live_grp_sel = st.selectbox(
             "Grup Filtresi", ["Tümü"] + list(live_groups), key="live_grp_tv"
         )

@@ -39,9 +39,10 @@ ROUND_LEVEL = {
     "round16":   2,
     "quarter":   3,
     "semi":      4,
-    "third":     4,
-    "finalist":  5,
-    "champion":  6,
+    "fourth":    4,
+    "third":     5,
+    "finalist":  6,
+    "champion":  7,
 }
 
 
@@ -320,7 +321,7 @@ def run_simulation(
                 ko_winners[mid] = w
                 ko_winners[f"loser_{mid}"] = l
                 counts[w]["third"] += 1
-                counts[l]["groups"] += 1  # 4. yer
+                counts[l]["fourth"] += 1
             else:
                 w, l = _simulate_ko_match(home, away, elo_map, rng)
                 ko_winners[mid] = w
@@ -362,14 +363,11 @@ def run_simulation(
             if loser:
                 counts[loser]["round32"] += 1
 
-        # Gruptan çıkamayanlar
+        # Gruptan çıkamayanlar (3. sıra best_thirds'e girmeyenler + 4. sıra)
         for grp_rows in standings.values():
             for pos, (team, *_) in enumerate(grp_rows):
-                if pos >= 2:
-                    third_pts  = grp_rows[2][1] if len(grp_rows) > 2 else -1
-                    this_pts   = grp_rows[pos][1]
-                    if team not in best_thirds:
-                        counts[team]["groups"] += 1
+                if pos >= 2 and team not in best_thirds:
+                    counts[team]["groups"] += 1
 
     # ── Normalize ve DataFrame oluştur ────────────────────────────────────
     n = n_simulations
@@ -380,6 +378,8 @@ def run_simulation(
             "p_champion": round(stat.get("champion", 0) / n, 4),
             "p_finalist": round(stat.get("finalist", 0) / n, 4),
             "p_semi":     round(stat.get("semi",     0) / n, 4),
+            "p_fourth":   round(stat.get("fourth",   0) / n, 4),
+            "p_third":    round(stat.get("third",    0) / n, 4),
             "p_quarter":  round(stat.get("quarter",  0) / n, 4),
             "p_round16":  round(stat.get("round16",  0) / n, 4),
             "p_round32":  round(stat.get("round32",  0) / n, 4),

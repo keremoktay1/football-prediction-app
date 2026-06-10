@@ -246,7 +246,11 @@ def load_models() -> Optional[dict]:
     *.pkl / *.joblib model dosyalarını yükler.
     En az bir dosya bulunursa dict döner; yoksa None.
     """
-    import importlib
+    try:
+        import importlib
+        joblib_mod = importlib.import_module("joblib")
+    except ImportError:
+        return None
 
     # Dosya isimleri notebook 03_model_training.ipynb çıktısıyla birebir eşleşir
     model_candidates = {
@@ -260,9 +264,6 @@ def load_models() -> Optional[dict]:
         "rf_model":        ["rf_model.pkl",        "rf_model.joblib"],
         "xgb_model":       ["xgb_model.pkl",       "xgb_model.joblib"],
     }
-
-    # joblib hem .pkl hem .joblib formatını okuyabilir
-    joblib_mod = importlib.import_module("joblib")
 
     models: dict = {}
     for name, filenames in model_candidates.items():

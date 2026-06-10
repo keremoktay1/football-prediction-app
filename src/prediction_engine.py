@@ -86,11 +86,10 @@ def _elo_to_3way(elo_home: float, elo_away: float, neutral: bool = True) -> Tupl
     advantage = 0.0 if neutral else 100.0
     we = _elo_win_prob(elo_home, elo_away, advantage)
     draw_frac = 0.22
-    ph = we * (1.0 - draw_frac)
-    pa = (1.0 - we) * (1.0 - draw_frac)
-    pd_ = draw_frac
-    total = ph + pd_ + pa
-    return round(ph / total, 4), round(pd_ / total, 4), round(pa / total, 4)
+    ph  = round(we * (1.0 - draw_frac), 4)
+    pa  = round((1.0 - we) * (1.0 - draw_frac), 4)
+    pd_ = round(1.0 - ph - pa, 4)  # garantili olarak toplam=1
+    return ph, pd_, pa
 
 
 # ──────────────────────────────────────────────

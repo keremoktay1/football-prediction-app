@@ -57,6 +57,20 @@ results        = standardize(results,        ["home_team", "away_team"])
 elo_raw        = standardize(elo_raw,        ["country"])
 group_fixtures = standardize(group_fixtures, ["home_team", "away_team"])
 
+# ── Playoff override'larını uygula (gerçek takım adları → Elo/form verisi bulunabilir)
+_overrides_path = os.path.join(PROCESSED_DIR, "playoff_overrides.csv")
+if os.path.isfile(_overrides_path):
+    _ov = pd.read_csv(_overrides_path, dtype=str)
+    _override_map = {
+        str(r["slot_name"]).strip(): str(r["actual_team"]).strip()
+        for _, r in _ov.iterrows()
+        if str(r.get("actual_team", "")).strip() not in ("", "nan", "None")
+    }
+    if _override_map:
+        group_fixtures["home_team"] = group_fixtures["home_team"].replace(_override_map)
+        group_fixtures["away_team"] = group_fixtures["away_team"].replace(_override_map)
+        print(f"  Playoff override uygulandı: {_override_map}")
+
 print("Standardizasyon tamamlandı ✅")
 
 
