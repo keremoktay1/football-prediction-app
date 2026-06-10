@@ -328,7 +328,10 @@ def run_simulation(
                 ko_winners[f"loser_{mid}"] = l
 
         # 5. Şampiyonu belirle (Final kazananı)
-        final_ko = ko_list[-1]  # Son eleman = Final (match_id 104)
+        finals = [ko for ko in ko_list if ko["round"] == "Final"]
+        if not finals:
+            finals = [ko_list[-1]]  # fallback
+        final_ko = finals[0]
         champion = ko_winners.get(final_ko["match_id"])
         finalist  = ko_winners.get(f"loser_{final_ko['match_id']}")
 

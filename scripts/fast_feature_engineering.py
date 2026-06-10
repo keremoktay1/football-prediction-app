@@ -208,6 +208,31 @@ def get_experience_score(team: str, date: pd.Timestamp, years: int = 3) -> int:
     return max(0, end_idx - start_idx)
 
 
+def get_goal_trend(team: str, date: pd.Timestamp) -> float:
+    """Pozitif = artan gol trendi, negatif = azalan."""
+    if team not in team_history: return 0.0
+    th = team_history[team]
+    ts = np.datetime64(date, "ns")
+    end_idx = int(np.searchsorted(th["dates"], ts, side="left"))
+    if end_idx < 3: return 0.0
+    gf_5  = th["gf"][max(0, end_idx-5):end_idx]
+    gf_10 = th["gf"][max(0, end_idx-10):end_idx]
+    avg5  = float(gf_5.mean())  if len(gf_5)  > 0 else 0.0
+    avg10 = float(gf_10.mean()) if len(gf_10) > 0 else 0.0
+    return round(avg5 - avg10, 4)
+
+
+def get_form_consistency(team: str, date: pd.Timestamp,
+                          n: int = ROLLING_FORM_WINDOW) -> float:
+    if team not in team_history: return 1.0
+    th = team_history[team]
+    ts = np.datetime64(date, "ns")
+    end_idx = int(np.searchsorted(th["dates"], ts, side="left"))
+    if end_idx < 2: return 1.0
+    pts = th["pts"][max(0, end_idx-n):end_idx]
+    return round(float(pts.std()), 4) if len(pts) > 1 else 1.0
+
+
 # ── H2H pre-indexing ──────────────────────────────────────────────────────────
 print("\nH2H ve ortak rakip indexleri oluşturuluyor...")
 
@@ -587,6 +612,14 @@ for i, (_, row) in enumerate(results_modern.iterrows()):
         "market_value_proxy_away":   get_squad_feat(away, "market_value_proxy"),
         "top5_league_count_home":    get_squad_feat(home, "top5_league_count"),
         "top5_league_count_away":    get_squad_feat(away, "top5_league_count"),
+        # ── Yeni feature'lar (43 toplam) ──
+        "goal_trend_home":           get_goal_trend(home, date),
+        "goal_trend_away":           get_goal_trend(away, date),
+        "form_consistency_home":     get_form_consistency(home, date),
+        "form_consistency_away":     get_form_consistency(away, date),
+        "attack_ratio_home":         round(ad_home["attack_strength"] / (ad_away["defense_weakness"] + 0.1), 4),
+        "attack_ratio_away":         round(ad_away["attack_strength"] / (ad_home["defense_weakness"] + 0.1), 4),
+        "elo_form_interaction":      round((elo_diff / 400.0) * (form_diff or 0.0), 4) if not np.isnan(elo_diff or 0.0) else 0.0,
         # ── Hedef ──
         "home_score":                hs,
         "away_score":                as_,
@@ -680,6 +713,14 @@ for _, row in group_fixtures.iterrows():
         "market_value_proxy_away":   get_squad_feat(away, "market_value_proxy"),
         "top5_league_count_home":    get_squad_feat(home, "top5_league_count"),
         "top5_league_count_away":    get_squad_feat(away, "top5_league_count"),
+        # ── Yeni feature'lar (43 toplam) ──
+        "goal_trend_home":           get_goal_trend(home, date),
+        "goal_trend_away":           get_goal_trend(away, date),
+        "form_consistency_home":     get_form_consistency(home, date),
+        "form_consistency_away":     get_form_consistency(away, date),
+        "attack_ratio_home":         round(ad_home["attack_strength"] / (ad_away["defense_weakness"] + 0.1), 4),
+        "attack_ratio_away":         round(ad_away["attack_strength"] / (ad_home["defense_weakness"] + 0.1), 4),
+        "elo_form_interaction":      round((elo_diff / 400.0) * (form_diff or 0.0), 4) if not np.isnan(elo_diff or 0.0) else 0.0,
     })
 
 future_df = pd.DataFrame(future_rows)
@@ -743,6 +784,7 @@ new_cols = [
     "h2h_goal_diff", "common_opponent_diff",
     "experience_score_home", "avg_age_home", "market_value_proxy_home",
     "top5_league_count_home",
+    "goal_trend_home", "form_consistency_home", "attack_ratio_home", "elo_form_interaction",
 ]
 for c in new_cols:
     pct_nan = features_df[c].isna().mean() * 100

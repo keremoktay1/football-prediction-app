@@ -59,6 +59,11 @@ FEATURE_COLS = [
     "market_value_proxy_away",
     "top5_league_count_home",
     "top5_league_count_away",
+    # ── Yeni feature'lar (43 toplam) ──
+    "goal_trend_home", "goal_trend_away",
+    "form_consistency_home", "form_consistency_away",
+    "attack_ratio_home", "attack_ratio_away",
+    "elo_form_interaction",
 ]
 
 POISSON_FEATURES = [

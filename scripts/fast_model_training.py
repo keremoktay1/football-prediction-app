@@ -14,8 +14,11 @@ Girdi:  data/processed/features_historical.csv
         models/poisson_scaler.pkl
         models/rf_model.pkl
         models/xgb_model.pkl
+        models/lgb_model.pkl          (lightgbm kuruluysa)
         data/processed/predictions_latest.csv
         data/processed/model_comparison.csv
+        data/processed/ensemble_weights.json
+        data/processed/feature_importance.csv (shap kuruluysa)
 """
 from __future__ import annotations
 
@@ -52,6 +55,13 @@ try:
 except ImportError:
     HAS_XGB = False
     print("[INFO] xgboost bulunamadı, atlanıyor.")
+
+try:
+    import lightgbm as lgb
+    HAS_LGB = True
+except Exception:
+    HAS_LGB = False
+    print("[INFO] lightgbm yüklenemedi, atlanıyor.")
 
 
 # ── Sabitler ──────────────────────────────────────────────────────────────────
@@ -94,6 +104,11 @@ FEATURE_COLS = [
     "market_value_proxy_away",
     "top5_league_count_home",
     "top5_league_count_away",
+    # ── Yeni feature'lar (43 toplam) ──
+    "goal_trend_home", "goal_trend_away",
+    "form_consistency_home", "form_consistency_away",
+    "attack_ratio_home", "attack_ratio_away",
+    "elo_form_interaction",
 ]
 POISSON_HOME_FEATS = ["elo_diff", "attack_home", "defense_away", "neutral", "tournament_weight"]
 POISSON_AWAY_FEATS = ["elo_diff", "attack_away", "defense_home", "neutral", "tournament_weight"]
@@ -225,6 +240,12 @@ print(f"  Test  : {len(test):>6,}  (2022 → bugün)")
 # ── 2026 WC match_updates — yüksek ağırlıklı yeniden eğitim ──────────────────
 train_weights = train["tournament_weight"].fillna(1.0).values.copy().astype(float)
 
+# Zaman azalma ağırlığı: eski maçlara daha az ağırlık
+# exp(-0.15 * (2026 - year)): 2023→0.64, 2020→0.41, 2015→0.17, 2005→0.05
+_years = pd.to_datetime(train["date"]).dt.year.fillna(2010).values
+_time_decay = np.exp(-0.15 * (2026 - _years))
+train_weights = train_weights * _time_decay
+
 updates_path = os.path.join(PROCESSED_DIR, "match_updates.csv")
 if os.path.isfile(updates_path):
     _updates_df = pd.read_csv(updates_path)
@@ -246,6 +267,7 @@ if os.path.isfile(updates_path):
             _wc2026["date"]   = pd.Timestamp("2026-06-01")
 
             train = pd.concat([train, _wc2026], ignore_index=True)
+            # WC 2026 satırları için time_decay uygulanmaz (zaten yüksek ağırlık)
             train_weights = np.concatenate([train_weights, np.full(len(_wc2026), 20.0)])
             print(f"\n  ✅  {len(_wc2026)} adet 2026 WC maçı eğitime eklendi (ağırlık=20.0)")
         else:
@@ -284,7 +306,7 @@ print(f"  Test  LL: {log_loss(y_test,  elo_test_prob,  labels=[0,1,2]):.4f}")
 # ── [2] Logistic Regression ───────────────────────────────────────────────────
 print("\n[2] Logistic Regression eğitiliyor...")
 lr_model = LogisticRegression(
-    multi_class="multinomial", solver="lbfgs",
+    solver="lbfgs",
     max_iter=500, C=1.0, class_weight="balanced", random_state=42,
 )
 lr_model.fit(X_train_t, y_train, sample_weight=train_weights)
@@ -294,6 +316,21 @@ print(f"  Valid LL: {log_loss(y_valid, lr_valid_prob, labels=[0,1,2]):.4f}  "
       f"Acc: {(lr_model.predict(X_valid_t)==y_valid).mean()*100:.1f}%")
 print(f"  Test  LL: {log_loss(y_test, lr_test_prob, labels=[0,1,2]):.4f}  "
       f"Acc: {(lr_model.predict(X_test_t)==y_test).mean()*100:.1f}%")
+
+try:
+    print("  LR kalibrasyonu (Platt scaling, cv=5)...")
+    calibrated_lr = CalibratedClassifierCV(lr_model, cv=5, method="sigmoid")
+    calibrated_lr.fit(X_train_t, y_train, sample_weight=train_weights)
+    cal_valid_prob = calibrated_lr.predict_proba(X_valid_t)
+    cal_test_prob  = calibrated_lr.predict_proba(X_test_t)
+    print(f"  Calibrated Valid LL: {log_loss(y_valid, cal_valid_prob, labels=[0,1,2]):.4f}")
+    print(f"  Calibrated Test  LL: {log_loss(y_test,  cal_test_prob,  labels=[0,1,2]):.4f}")
+    if log_loss(y_test, cal_test_prob, labels=[0,1,2]) < log_loss(y_test, lr_test_prob, labels=[0,1,2]):
+        print("  Kalibrasyon iyileştirdi — calibrated LR kullanılacak.")
+        lr_valid_prob = cal_valid_prob
+        lr_test_prob  = cal_test_prob
+except Exception as _cal_err:
+    print(f"  [WARN] Kalibrasyon atlandı: {_cal_err}")
 
 
 # ── [3] Poisson xG modeli ─────────────────────────────────────────────────────
@@ -344,28 +381,44 @@ print(f"  Valid LL: {log_loss(y_valid, poi_valid_prob, labels=[0,1,2]):.4f}")
 print(f"  Test  LL: {log_loss(y_test,  poi_test_prob,  labels=[0,1,2]):.4f}")
 
 
-# ── [4] LR + Poisson Ensemble ─────────────────────────────────────────────────
-print("\n[4] Ensemble (LR 50% + Poisson 50%)...")
+# ── [4] Ensemble ağırlık optimizasyonu (scipy.minimize) ───────────────────────
+# Not: RF ve LGB henüz bu noktada eğitilmemiş; basit LR+Poisson ensemble olarak
+# başlatılır ve RF/LGB eklendikten sonra optimize_weights() ile yeniden çalıştırılır.
+print("\n[4] Ensemble (başlangıç: LR 50% + Poisson 50%)...")
 ens_valid_prob = (lr_valid_prob + poi_valid_prob) / 2
 ens_test_prob  = (lr_test_prob  + poi_test_prob)  / 2
-# normalize rows
 ens_valid_prob /= ens_valid_prob.sum(axis=1, keepdims=True)
 ens_test_prob  /= ens_test_prob.sum(axis=1, keepdims=True)
 print(f"  Valid LL: {log_loss(y_valid, ens_valid_prob, labels=[0,1,2]):.4f}  "
       f"Acc: {(ens_valid_prob.argmax(1)==y_valid).mean()*100:.1f}%")
 print(f"  Test  LL: {log_loss(y_test,  ens_test_prob,  labels=[0,1,2]):.4f}  "
       f"Acc: {(ens_test_prob.argmax(1)==y_test).mean()*100:.1f}%")
+# Optimal ağırlıklar RF ve LGB eğitiminden sonra hesaplanır (bkz. aşağıda)
+optimal_weights_dict = {"LR": 0.5, "Poisson": 0.5}
+_opt_w = np.array([0.5, 0.5])
 
 
-# ── [5] Random Forest ────────────────────────────────────────────────────────
-print("\n[5] Random Forest eğitiliyor...")
-rf_model = RandomForestClassifier(
-    n_estimators=300, max_depth=8, min_samples_leaf=20,
-    class_weight="balanced", random_state=42, n_jobs=-1,
+# ── [5] Random Forest (RandomizedSearchCV ile) ────────────────────────────────
+print("\n[5] Random Forest (RandomizedSearchCV ile)...")
+from sklearn.model_selection import RandomizedSearchCV as RSCV
+_rf_params = {
+    "n_estimators":    [200, 300, 500],
+    "max_depth":       [6, 8, 10, None],
+    "min_samples_leaf":[10, 20, 30],
+    "max_features":    ["sqrt", 0.5, 0.7],
+}
+_rf_base = RandomForestClassifier(
+    class_weight="balanced", random_state=42, n_jobs=-1
 )
-rf_model.fit(X_train_t, y_train, sample_weight=train_weights)
+rf_search = RSCV(
+    _rf_base, _rf_params, n_iter=15, cv=3,
+    scoring="neg_log_loss", random_state=42, n_jobs=-1, verbose=0,
+)
+rf_search.fit(X_train_t, y_train, sample_weight=train_weights)
+rf_model = rf_search.best_estimator_
 rf_valid_prob = rf_model.predict_proba(X_valid_t)
 rf_test_prob  = rf_model.predict_proba(X_test_t)
+print(f"  Best params: {rf_search.best_params_}")
 print(f"  Valid LL: {log_loss(y_valid, rf_valid_prob, labels=[0,1,2]):.4f}  "
       f"Acc: {(rf_model.predict(X_valid_t)==y_valid).mean()*100:.1f}%")
 print(f"  Test  LL: {log_loss(y_test,  rf_test_prob,  labels=[0,1,2]):.4f}  "
@@ -398,6 +451,76 @@ else:
     xgb_test_prob  = lr_test_prob.copy()
 
 
+# ── [7] LightGBM ──────────────────────────────────────────────────────────────
+if HAS_LGB:
+    print("\n[7] LightGBM eğitiliyor...")
+    from sklearn.model_selection import RandomizedSearchCV as RSCV
+    _lgb_base = lgb.LGBMClassifier(
+        objective="multiclass", num_class=3,
+        class_weight="balanced", random_state=42, n_jobs=-1, verbose=-1,
+    )
+    _lgb_params = {
+        "n_estimators":     [300, 500, 700],
+        "max_depth":        [4, 6, 8],
+        "learning_rate":    [0.03, 0.05, 0.1],
+        "num_leaves":       [31, 63, 127],
+        "subsample":        [0.7, 0.8, 0.9],
+        "colsample_bytree": [0.7, 0.8],
+    }
+    lgb_search = RSCV(
+        _lgb_base, _lgb_params, n_iter=20, cv=3,
+        scoring="neg_log_loss", random_state=42, n_jobs=-1, verbose=0,
+    )
+    lgb_search.fit(X_train_t, y_train, sample_weight=train_weights)
+    lgb_model = lgb_search.best_estimator_
+    lgb_valid_prob = lgb_model.predict_proba(X_valid_t)
+    lgb_test_prob  = lgb_model.predict_proba(X_test_t)
+    print(f"  Best params: {lgb_search.best_params_}")
+    print(f"  Valid LL: {log_loss(y_valid, lgb_valid_prob, labels=[0,1,2]):.4f}  "
+          f"Acc: {(lgb_model.predict(X_valid_t)==y_valid).mean()*100:.1f}%")
+    print(f"  Test  LL: {log_loss(y_test, lgb_test_prob, labels=[0,1,2]):.4f}  "
+          f"Acc: {(lgb_model.predict(X_test_t)==y_test).mean()*100:.1f}%")
+
+
+# ── Ensemble ağırlık optimizasyonu (scipy.minimize) ──────────────────────────
+from scipy.optimize import minimize
+
+print("\n[4b] Ensemble ağırlık optimizasyonu (scipy.minimize)...")
+
+_opt_probs_valid = [lr_valid_prob, poi_valid_prob, rf_valid_prob]
+_opt_probs_test  = [lr_test_prob,  poi_test_prob,  rf_test_prob]
+_model_names_opt = ["LR", "Poisson", "RF"]
+if HAS_LGB:
+    _opt_probs_valid.append(lgb_valid_prob)
+    _opt_probs_test.append(lgb_test_prob)
+    _model_names_opt.append("LGB")
+
+n_models = len(_opt_probs_valid)
+
+def _ens_loss(w):
+    w = np.abs(w); w /= w.sum()
+    blend = sum(wi * p for wi, p in zip(w, _opt_probs_valid))
+    blend = blend / blend.sum(axis=1, keepdims=True)
+    return float(log_loss(y_valid, blend, labels=[0,1,2]))
+
+_res = minimize(_ens_loss, x0=np.ones(n_models)/n_models, method="Nelder-Mead",
+                options={"maxiter": 500, "xatol": 1e-4})
+_opt_w = np.abs(_res.x); _opt_w /= _opt_w.sum()
+print(f"  Optimum ağırlıklar: " +
+      "  ".join(f"{n}={w:.3f}" for n, w in zip(_model_names_opt, _opt_w)))
+
+ens_valid_prob = sum(w * p for w, p in zip(_opt_w, _opt_probs_valid))
+ens_valid_prob /= ens_valid_prob.sum(axis=1, keepdims=True)
+ens_test_prob  = sum(w * p for w, p in zip(_opt_w, _opt_probs_test))
+ens_test_prob  /= ens_test_prob.sum(axis=1, keepdims=True)
+print(f"  Valid LL: {log_loss(y_valid, ens_valid_prob, labels=[0,1,2]):.4f}  "
+      f"Acc: {(ens_valid_prob.argmax(1)==y_valid).mean()*100:.1f}%")
+print(f"  Test  LL: {log_loss(y_test, ens_test_prob, labels=[0,1,2]):.4f}  "
+      f"Acc: {(ens_test_prob.argmax(1)==y_test).mean()*100:.1f}%")
+
+optimal_weights_dict = dict(zip(_model_names_opt, _opt_w.tolist()))
+
+
 # ── Model karşılaştırma tablosu ───────────────────────────────────────────────
 print("\n" + "=" * 55)
 print("MODEL KARŞILAŞTIRMA TABLOSU")
@@ -414,6 +537,8 @@ model_probs = {
 }
 if HAS_XGB:
     model_probs["XGBoost"] = (xgb_valid_prob, xgb_test_prob)
+if HAS_LGB:
+    model_probs["LightGBM"] = (lgb_valid_prob, lgb_test_prob)
 
 for mname, (vp, tp) in model_probs.items():
     vm = compute_metrics(y_valid, vp, "valid", mname)
@@ -460,14 +585,30 @@ poisson_df = pd.DataFrame(poisson_rows).rename(columns={
 })
 future = future.merge(poisson_df, on="match_id", how="left")
 
-# Ensemble
-future["p_home"] = (future["p_home_lr"] + future["p_home_poi"]) / 2
-future["p_draw"] = (future["p_draw_lr"] + future["p_draw_poi"]) / 2
-future["p_away"] = (future["p_away_lr"] + future["p_away_poi"]) / 2
-total = future["p_home"] + future["p_draw"] + future["p_away"]
-future["p_home"] = (future["p_home"] / total).round(4)
-future["p_draw"] = (future["p_draw"] / total).round(4)
-future["p_away"] = (future["p_away"] / total).round(4)
+# Ensemble tahmini: optimal ağırlıklı
+_future_probs_list = [
+    lr_model.predict_proba(X_future_t),
+    np.column_stack([future["p_home_poi"].values,
+                     future["p_draw_poi"].values,
+                     future["p_away_poi"].values]),
+    rf_model.predict_proba(X_future_t),
+]
+_future_model_names = ["LR", "Poisson", "RF"]
+if HAS_LGB:
+    _future_probs_list.append(lgb_model.predict_proba(X_future_t))
+    _future_model_names.append("LGB")
+
+# Optimal ağırlıkları al (sıra: _model_names_opt ile uyumlu)
+_ens_w = np.array([optimal_weights_dict.get(n, 1.0/_opt_w.shape[0])
+                   for n in _future_model_names])
+_ens_w /= _ens_w.sum()
+
+ens_future = sum(w * p for w, p in zip(_ens_w, _future_probs_list))
+ens_future /= ens_future.sum(axis=1, keepdims=True)
+
+future["p_home"] = ens_future[:, 0].round(4)
+future["p_draw"] = ens_future[:, 1].round(4)
+future["p_away"] = ens_future[:, 2].round(4)
 
 def get_favourite(row):
     mx = max(row["p_home"], row["p_draw"], row["p_away"])
@@ -498,11 +639,58 @@ joblib.dump(scaler_p,        os.path.join(MODEL_DIR, "poisson_scaler.pkl"))
 joblib.dump(rf_model,        os.path.join(MODEL_DIR, "rf_model.pkl"))
 if HAS_XGB:
     joblib.dump(xgb_model,   os.path.join(MODEL_DIR, "xgb_model.pkl"))
+if HAS_LGB:
+    joblib.dump(lgb_model,   os.path.join(MODEL_DIR, "lgb_model.pkl"))
+
+import json
+_weights_path = os.path.join(PROCESSED_DIR, "ensemble_weights.json")
+with open(_weights_path, "w") as f:
+    json.dump(optimal_weights_dict, f, indent=2)
+print(f"  ✅  ensemble_weights.json → {_weights_path}")
 
 print("  Kaydedilen modeller:")
 for f in sorted(os.listdir(MODEL_DIR)):
     sz = os.path.getsize(os.path.join(MODEL_DIR, f)) / 1024
     print(f"    {f:<35} {sz:.0f} KB")
+
+try:
+    import shap
+    print("\n[SHAP] Feature importance hesaplanıyor...")
+    _shap_model = lgb_model if HAS_LGB else rf_model
+    _explainer  = shap.TreeExplainer(_shap_model)
+    _X_shap = X_train_t[:min(2000, len(X_train_t))]
+    _shap_vals = _explainer.shap_values(_X_shap)
+
+    # SHAP API uyumluluğu: liste veya 3D array farklı shape döner
+    if isinstance(_shap_vals, list):
+        # Eski API: list of (n_samples, n_features) per class
+        _mean_shap = np.mean([np.abs(sv).mean(axis=0) for sv in _shap_vals], axis=0)
+    else:
+        _sv = np.array(_shap_vals)
+        if _sv.ndim == 3 and _sv.shape[0] == 3:
+            # (n_classes, n_samples, n_features)
+            _mean_shap = np.abs(_sv).mean(axis=0).mean(axis=0)
+        elif _sv.ndim == 3 and _sv.shape[2] == 3:
+            # (n_samples, n_features, n_classes)
+            _mean_shap = np.abs(_sv).mean(axis=0).mean(axis=1)
+        else:
+            # fallback: squeeze any extra dims and average
+            _mean_shap = np.abs(_sv).reshape(-1, len(FEATURE_COLS)).mean(axis=0)
+
+    assert len(_mean_shap) == len(FEATURE_COLS), \
+        f"SHAP shape uyumsuz: {len(_mean_shap)} != {len(FEATURE_COLS)}"
+
+    _importance_df = pd.DataFrame({
+        "feature":         FEATURE_COLS,
+        "shap_importance": _mean_shap,
+    }).sort_values("shap_importance", ascending=False)
+    _imp_path = os.path.join(PROCESSED_DIR, "feature_importance.csv")
+    _importance_df.to_csv(_imp_path, index=False)
+    print(f"  ✅  feature_importance.csv → {_imp_path}")
+    print("  Top 10:")
+    print(_importance_df.head(10).to_string(index=False))
+except Exception as _e:
+    print(f"  [WARN] SHAP hesaplanamadı: {_e}")
 
 
 # ── Tahminler kaydetme ────────────────────────────────────────────────────────
@@ -561,13 +749,13 @@ poi_future = np.column_stack([
 ])
 _add_model_rows("Poisson", poi_future, _lh, _la)
 
-# Ensemble
-ens_future = np.column_stack([
+# Ensemble (optimal ağırlıklı)
+ens_future_arr = np.column_stack([
     future["p_home"].values,
     future["p_draw"].values,
     future["p_away"].values,
 ])
-_add_model_rows("Ensemble", ens_future, _lh, _la)
+_add_model_rows("Ensemble", ens_future_arr, _lh, _la)
 
 # Random Forest
 _add_model_rows("Random Forest", rf_model.predict_proba(X_future_t))
@@ -575,6 +763,10 @@ _add_model_rows("Random Forest", rf_model.predict_proba(X_future_t))
 # XGBoost
 if HAS_XGB:
     _add_model_rows("XGBoost", xgb_model.predict_proba(X_future_t))
+
+# LightGBM
+if HAS_LGB:
+    _add_model_rows("LightGBM", lgb_model.predict_proba(X_future_t))
 
 all_models_df = pd.DataFrame(all_model_rows)
 all_models_path = os.path.join(PROCESSED_DIR, "predictions_all_models.csv")

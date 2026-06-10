@@ -77,6 +77,23 @@ with mcol2:
         key="n_sim",
     )
 
+if played_count > 0:
+    update_btn = st.button(
+        "🔄  Tahminleri Güncelle (oynanan maçlara göre)",
+        use_container_width=True,
+    )
+    if update_btn:
+        import subprocess
+        result = subprocess.run(
+            ["python", "scripts/update_tournament_predictions.py"],
+            capture_output=True, text=True, cwd=APP_DIR
+        )
+        if result.returncode == 0:
+            st.success("✅ Tahminler güncellendi!")
+            predictions = load_predictions()  # yeniden yükle
+        else:
+            st.error(f"Hata: {result.stderr}")
+
 run_btn = st.button(
     "▶️  Simülasyonu Çalıştır / Yeniden Çalıştır",
     use_container_width=True,
@@ -93,7 +110,7 @@ if run_btn:
                 updates=updates,
                 elo_map=elo_map,
                 n_simulations=n_sim_choice,
-                seed=42,
+                seed=None,   # Her çalıştırmada farklı random tohum → gerçek Monte Carlo
             )
             save_simulation(sim_df, n_sim_choice, played_count)
             st.success(f"✅ {n_sim_choice:,} simülasyon tamamlandı!")
@@ -154,6 +171,44 @@ try:
     )
     fig.update_traces(textposition="outside")
     st.plotly_chart(fig, use_container_width=True)
+
+    # ── Aşama × Takım olasılık ısı haritası ──────────────────────────────────
+    st.markdown("#### Turnuva Eleme Haritası — İlk 20 Takım")
+    import plotly.graph_objects as go
+
+    _stages = [
+        ("p_round32",  "Son 32"),
+        ("p_round16",  "Son 16"),
+        ("p_quarter",  "Çeyrek"),
+        ("p_semi",     "Yarı Final"),
+        ("p_finalist", "Final"),
+        ("p_champion", "Şampiyon"),
+    ]
+    avail = [(col, lbl) for col, lbl in _stages if col in sim_df.columns]
+    if avail:
+        top20 = sim_df.head(20).copy()
+        z = (top20[[col for col, _ in avail]].values * 100).round(1)
+        text_z = [[f"{v:.1f}%" for v in row] for row in z]
+        fig_heat = go.Figure(go.Heatmap(
+            z=z,
+            x=[lbl for _, lbl in avail],
+            y=top20["team"].tolist(),
+            colorscale="Blues",
+            text=text_z,
+            texttemplate="%{text}",
+            textfont={"size": 10},
+            showscale=False,
+        ))
+        fig_heat.update_layout(
+            height=560,
+            yaxis={"autorange": "reversed"},
+            margin={"t": 10, "b": 10, "l": 10, "r": 10},
+            paper_bgcolor="#0E1117",
+            plot_bgcolor="#0E1117",
+            font_color="white",
+        )
+        st.plotly_chart(fig_heat, use_container_width=True)
+
 except ImportError:
     # Plotly yoksa tablo göster
     top16 = sim_df.head(16).copy()
