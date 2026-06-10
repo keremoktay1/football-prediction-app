@@ -50,6 +50,15 @@ FEATURE_COLS = [
     "failed_to_score_rate_away",
     "h2h_goal_diff",
     "common_opponent_diff",
+    # ── Yeni feature'lar (36 toplam) ──
+    "experience_score_home",
+    "experience_score_away",
+    "avg_age_home",
+    "avg_age_away",
+    "market_value_proxy_home",
+    "market_value_proxy_away",
+    "top5_league_count_home",
+    "top5_league_count_away",
 ]
 
 POISSON_FEATURES = [
@@ -171,8 +180,10 @@ def predict_with_model(
 
     try:
         # --- LR olasılıkları ---
-        X_lr = features_row[FEATURE_COLS].values.reshape(1, -1)
-        X_lr_t = preprocessor.transform(pd.DataFrame([features_row[FEATURE_COLS]]))
+        # Eksik feature'lar NaN ile doldurulur (imputer median ile işler)
+        feat_dict = {c: features_row.get(c, np.nan) for c in FEATURE_COLS}
+        X_feat = pd.DataFrame([feat_dict])
+        X_lr_t = preprocessor.transform(X_feat)
         proba = lr_model.predict_proba(X_lr_t)[0]
         classes = list(lr_model.classes_)
 
@@ -189,7 +200,7 @@ def predict_with_model(
         lh = la = None
         if home_goal and away_goal and poi_imp and poi_scl:
             try:
-                X_poi = features_row[POISSON_FEATURES].values.reshape(1, -1)
+                X_poi = pd.DataFrame([{c: features_row.get(c, np.nan) for c in POISSON_FEATURES}])
                 X_poi_imp = poi_imp.transform(X_poi)
                 X_poi_scl = poi_scl.transform(X_poi_imp)
                 lh = max(0.3, float(home_goal.predict(X_poi_scl)[0]))

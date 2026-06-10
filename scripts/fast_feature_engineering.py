@@ -28,6 +28,33 @@ from config import FILES, TEAM_NAME_MAP, ROLLING_FORM_WINDOW, BASE_GOAL_RATE
 PROCESSED_DIR = os.path.join(APP_DIR, "data", "processed")
 os.makedirs(PROCESSED_DIR, exist_ok=True)
 
+# ── Squad stats yükleme (enrich_team_data.py çalıştırılmışsa kullanılır) ──────
+_squad_path = os.path.join(PROCESSED_DIR, "squad_stats.csv")
+if os.path.isfile(_squad_path):
+    _squad_df = pd.read_csv(_squad_path).set_index("team")
+    _squad_map: dict = _squad_df.to_dict("index")
+    _global_avg_age = float(_squad_df["avg_age"].mean())
+    _global_mv      = float(_squad_df["market_value_proxy"].mean())
+    _global_t5      = float(_squad_df["top5_league_count"].mean())
+    print(f"[OK]  squad_stats.csv yüklendi: {len(_squad_df)} takım")
+else:
+    _squad_map = {}
+    _global_avg_age, _global_mv, _global_t5 = 26.0, 30.0, 10.0
+    print("[INFO] squad_stats.csv bulunamadı — global ortalamalar kullanılacak")
+
+def get_squad_feat(team: str, feat: str) -> float:
+    """Squad stats'dan bir özellik döner. Bulunamazsa global ortalama."""
+    if team in _squad_map:
+        val = _squad_map[team].get(feat, None)
+        if val is not None and not (isinstance(val, float) and np.isnan(val)):
+            return float(val)
+    defaults = {
+        "avg_age":            _global_avg_age,
+        "market_value_proxy": _global_mv,
+        "top5_league_count":  _global_t5,
+    }
+    return defaults.get(feat, 0.0)
+
 
 # ── Veri yükleme ─────────────────────────────────────────────────────────────
 print("Veriler yükleniyor...")
@@ -166,6 +193,19 @@ for team in all_teams:
     }
 
 print(f"Takım geçmişleri hazır: {len(team_history)} takım")
+
+
+# ── Experience score (son N yıldaki uluslararası maç sayısı) ──────────────────
+def get_experience_score(team: str, date: pd.Timestamp, years: int = 3) -> int:
+    """Takımın verilen tarihten önceki son `years` yıldaki maç sayısı."""
+    if team not in team_history:
+        return 0
+    th = team_history[team]
+    ts     = np.datetime64(date, "ns")
+    cutoff = np.datetime64(date - pd.DateOffset(years=years), "ns")
+    end_idx   = int(np.searchsorted(th["dates"], ts,     side="left"))
+    start_idx = int(np.searchsorted(th["dates"], cutoff, side="left"))
+    return max(0, end_idx - start_idx)
 
 
 # ── H2H pre-indexing ──────────────────────────────────────────────────────────
@@ -402,6 +442,56 @@ def upset_label(score: float) -> str:
     return "Düşük"
 
 
+def compute_upset_risk_v2(
+    elo_diff: float,
+    underdog_form: float,
+    favorite_form: float,
+    neutral: int,
+    underdog_mv: float = 0.0,
+    favorite_mv: float = 0.0,
+    underdog_exp: int = 0,
+    favorite_exp: int = 0,
+) -> float:
+    """
+    Genişletilmiş sürpriz riski (2026 fikstürleri için).
+    Squad stats mevcut olduğunda market value ve deneyim bileşenlerini kullanır.
+    """
+    if np.isnan(elo_diff) or elo_diff == 0:
+        return 0.5
+    abs_diff = abs(elo_diff)
+    elo_component = 1 - min(abs_diff / 600.0, 1.0)
+
+    underdog_form_score = 0.5
+    if not np.isnan(underdog_form) and underdog_form > 0:
+        underdog_form_score = min(underdog_form / (ROLLING_FORM_WINDOW * 3), 1.0)
+
+    fav_neg_momentum = 0.5
+    if not np.isnan(favorite_form) and favorite_form > 0:
+        fav_neg_momentum = 1 - min(favorite_form / (ROLLING_FORM_WINDOW * 3), 1.0)
+
+    neutral_component = 0.3 if neutral else 0.0
+
+    # Piyasa değeri bileşeni: ELO'ya kıyasla market value'su yüksek underdog
+    value_component = 0.5
+    if underdog_mv > 0 and favorite_mv > 0:
+        mv_ratio  = underdog_mv / favorite_mv
+        elo_ratio = 1 / (1 + 10 ** (-elo_diff / 400))
+        value_component = min(1.0, max(0.0, 0.5 + (mv_ratio - elo_ratio) * 2))
+
+    # Deneyim bileşeni
+    exp_component = 0.6 if underdog_exp > 50 else (0.4 if underdog_exp > 30 else 0.3)
+
+    upset_risk = (
+        0.35 * elo_component
+        + 0.20 * underdog_form_score
+        + 0.15 * fav_neg_momentum
+        + 0.10 * neutral_component
+        + 0.10 * value_component
+        + 0.10 * exp_component
+    )
+    return round(min(max(upset_risk, 0.0), 1.0), 4)
+
+
 # ── Tarihi maç feature matrisi ────────────────────────────────────────────────
 print("\nTarihi feature matrisi oluşturuluyor...")
 
@@ -488,6 +578,15 @@ for i, (_, row) in enumerate(results_modern.iterrows()):
         "failed_to_score_rate_away": form_away["failed_to_score_rate"],
         "h2h_goal_diff":             h2h_diff,
         "common_opponent_diff":      co_diff,
+        # ── Deneyim & kadro istatistikleri ──
+        "experience_score_home":     get_experience_score(home, date),
+        "experience_score_away":     get_experience_score(away, date),
+        "avg_age_home":              get_squad_feat(home, "avg_age"),
+        "avg_age_away":              get_squad_feat(away, "avg_age"),
+        "market_value_proxy_home":   get_squad_feat(home, "market_value_proxy"),
+        "market_value_proxy_away":   get_squad_feat(away, "market_value_proxy"),
+        "top5_league_count_home":    get_squad_feat(home, "top5_league_count"),
+        "top5_league_count_away":    get_squad_feat(away, "top5_league_count"),
         # ── Hedef ──
         "home_score":                hs,
         "away_score":                as_,
@@ -572,14 +671,40 @@ for _, row in group_fixtures.iterrows():
         "failed_to_score_rate_away": form_away["failed_to_score_rate"],
         "h2h_goal_diff":             h2h_diff,
         "common_opponent_diff":      co_diff,
+        # ── Deneyim & kadro istatistikleri ──
+        "experience_score_home":     get_experience_score(home, date),
+        "experience_score_away":     get_experience_score(away, date),
+        "avg_age_home":              get_squad_feat(home, "avg_age"),
+        "avg_age_away":              get_squad_feat(away, "avg_age"),
+        "market_value_proxy_home":   get_squad_feat(home, "market_value_proxy"),
+        "market_value_proxy_away":   get_squad_feat(away, "market_value_proxy"),
+        "top5_league_count_home":    get_squad_feat(home, "top5_league_count"),
+        "top5_league_count_away":    get_squad_feat(away, "top5_league_count"),
     })
 
 future_df = pd.DataFrame(future_rows)
 
-# Upset risk ekle
+# Upset risk ekle (2026 fikstürleri için genişletilmiş v2 formülü)
 future_df["upset_risk"] = future_df.apply(
-    lambda r: compute_upset_risk(
-        r["elo_diff"], r["weighted_form_away"], r["weighted_form_home"], r["neutral"]
+    lambda r: compute_upset_risk_v2(
+        r["elo_diff"],
+        r["weighted_form_away"], r["weighted_form_home"], r["neutral"],
+        underdog_mv=float(min(
+            r.get("market_value_proxy_home", 0) or 0,
+            r.get("market_value_proxy_away",  0) or 0,
+        )),
+        favorite_mv=float(max(
+            r.get("market_value_proxy_home", 0) or 0,
+            r.get("market_value_proxy_away",  0) or 0,
+        )),
+        underdog_exp=int(min(
+            r.get("experience_score_home", 0) or 0,
+            r.get("experience_score_away",  0) or 0,
+        )),
+        favorite_exp=int(max(
+            r.get("experience_score_home", 0) or 0,
+            r.get("experience_score_away",  0) or 0,
+        )),
     ),
     axis=1,
 )
@@ -616,6 +741,8 @@ new_cols = [
     "points_last_5_home", "goal_diff_last_5_home", "win_streak_home",
     "loss_streak_home", "clean_sheet_rate_home", "failed_to_score_rate_home",
     "h2h_goal_diff", "common_opponent_diff",
+    "experience_score_home", "avg_age_home", "market_value_proxy_home",
+    "top5_league_count_home",
 ]
 for c in new_cols:
     pct_nan = features_df[c].isna().mean() * 100

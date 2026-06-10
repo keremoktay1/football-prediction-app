@@ -85,6 +85,15 @@ FEATURE_COLS = [
     "failed_to_score_rate_away",
     "h2h_goal_diff",
     "common_opponent_diff",
+    # ── Yeni feature'lar (36 toplam) ──
+    "experience_score_home",
+    "experience_score_away",
+    "avg_age_home",
+    "avg_age_away",
+    "market_value_proxy_home",
+    "market_value_proxy_away",
+    "top5_league_count_home",
+    "top5_league_count_away",
 ]
 POISSON_HOME_FEATS = ["elo_diff", "attack_home", "defense_away", "neutral", "tournament_weight"]
 POISSON_AWAY_FEATS = ["elo_diff", "attack_away", "defense_home", "neutral", "tournament_weight"]

@@ -165,7 +165,7 @@ def _show_bracket(ko_df: pd.DataFrame, use_pred_winner: bool = False) -> None:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Sekmeler
 # ═══════════════════════════════════════════════════════════════════════════════
-tab_pred, tab_live = st.tabs(["🔮 Model Tahmini", "⚽ Canlı"])
+tab_pred, tab_live, tab_dark = st.tabs(["🔮 Model Tahmini", "⚽ Canlı", "🎯 Dark Horses"])
 
 # ══════════════════════════════════════════════════════
 # TAB 1 — Model Tahmini
@@ -400,3 +400,111 @@ with tab_live:
     # ── Knockout bracket ──────────────────────────────────────────────────────
     st.markdown("### 🏆 Eleme Turu Bracket (Canlı)")
     _show_bracket(ko_live, use_pred_winner=False)
+
+
+# ══════════════════════════════════════════════════════
+# TAB 3 — Dark Horses
+# ══════════════════════════════════════════════════════
+with tab_dark:
+    st.markdown("### 🎯 Turnuva Sürpriz Adayları")
+    st.caption(
+        "Düşük ELO'ya rağmen yüksek sürpriz riski taşıyan underdog takımlar. "
+        "Formları, market değerleri ve deneyimleri onları tehlikeli kılıyor."
+    )
+
+    _clusters_path = os.path.join(APP_DIR, "data", "processed", "team_clusters.csv")
+    _squad_path    = os.path.join(APP_DIR, "data", "processed", "squad_stats.csv")
+
+    _clusters_df = None
+    _squad_df    = None
+    if os.path.isfile(_clusters_path):
+        try:
+            _clusters_df = pd.read_csv(_clusters_path)
+        except Exception:
+            pass
+    if os.path.isfile(_squad_path):
+        try:
+            _squad_df = pd.read_csv(_squad_path)
+        except Exception:
+            pass
+
+    if predictions is None or predictions.empty:
+        st.error("❌ `predictions_latest.csv` bulunamadı. Modeli yeniden eğitin.")
+    else:
+        _preds = predictions.copy()
+        dark_horses: list[dict] = []
+
+        for _, row in _preds.iterrows():
+            try:
+                risk = float(row.get("upset_risk", 0) or 0)
+                if risk < 0.45:
+                    continue
+                elo_h = float(row.get("elo_home", 1700) or 1700)
+                elo_a = float(row.get("elo_away", 1700) or 1700)
+                # Underdog: düşük ELO tarafı
+                if elo_h < elo_a:
+                    dark_horses.append({
+                        "team":      str(row["home_team"]),
+                        "elo":       elo_h,
+                        "opp_elo":   elo_a,
+                        "opponent":  str(row["away_team"]),
+                        "upset_risk": risk,
+                    })
+                else:
+                    dark_horses.append({
+                        "team":      str(row["away_team"]),
+                        "elo":       elo_a,
+                        "opp_elo":   elo_h,
+                        "opponent":  str(row["home_team"]),
+                        "upset_risk": risk,
+                    })
+            except Exception:
+                continue
+
+        if not dark_horses:
+            st.info("Yüksek sürpriz riski (≥%45) olan underdog maç bulunamadı.")
+        else:
+            dh_df = pd.DataFrame(dark_horses)
+            dh_df = dh_df.sort_values("upset_risk", ascending=False)
+            # Takım başına en yüksek risk
+            dh_df = dh_df.drop_duplicates("team").reset_index(drop=True)
+
+            # Cluster bilgisi
+            if _clusters_df is not None:
+                dh_df = dh_df.merge(
+                    _clusters_df[["team", "cluster_label"]],
+                    on="team", how="left",
+                )
+            else:
+                dh_df["cluster_label"] = None
+
+            # Squad stats
+            if _squad_df is not None:
+                dh_df = dh_df.merge(
+                    _squad_df[["team", "top5_league_count", "goals_per90", "market_value_proxy"]],
+                    on="team", how="left",
+                )
+
+            for _, row in dh_df.iterrows():
+                risk_pct = float(row["upset_risk"]) * 100
+                team     = str(row["team"])
+                label    = str(row.get("cluster_label", "—") or "—")
+
+                st.markdown(f"#### 🏴 {team} &nbsp; <small>({label})</small>",
+                             unsafe_allow_html=True)
+
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("ELO", f"{int(row['elo'])}")
+                c2.metric("Rakip ELO", f"{int(row['opp_elo'])}")
+                c3.metric("ELO Farkı", f"-{int(row['opp_elo'] - row['elo'])}")
+                c4.metric("Rakip", str(row["opponent"]))
+
+                if "top5_league_count" in row and pd.notna(row.get("top5_league_count")):
+                    d1, d2, d3 = st.columns(3)
+                    d1.metric("Top 5 Lig Oyuncusu", f"{int(row['top5_league_count'])}")
+                    d2.metric("Gol/90", f"{float(row.get('goals_per90', 0)):.2f}")
+                    d3.metric("Market Proxy", f"{float(row.get('market_value_proxy', 0)):.1f}")
+
+                st.progress(min(1.0, float(row["upset_risk"])),
+                            text=f"Sürpriz Riski: {risk_pct:.0f}%")
+                st.markdown("---")

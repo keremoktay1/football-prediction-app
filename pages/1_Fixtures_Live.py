@@ -44,6 +44,15 @@ except Exception as exc:
     st.error(f"Veri yükleme hatası: {exc}")
     st.stop()
 
+# Bahis oranları (opsiyonel)
+_odds_path = os.path.join(APP_DIR, "data", "processed", "odds_cache.csv")
+odds_cache: pd.DataFrame | None = None
+if os.path.isfile(_odds_path):
+    try:
+        odds_cache = pd.read_csv(_odds_path)
+    except Exception:
+        pass
+
 if fixtures is None:
     st.error("❌ GROUP_FIXTURES.CSV bulunamadı.")
     st.stop()
@@ -69,6 +78,16 @@ else:
     merged = fixtures.copy()
     for c in ("p_home", "p_draw", "p_away"):
         merged[c] = None
+
+# Bahis oranlarını birleştir (opsiyonel)
+if odds_cache is not None and not odds_cache.empty:
+    _odds_keep = [c for c in ["match_id", "odds_home", "odds_draw", "odds_away",
+                               "implied_home", "implied_draw", "implied_away"]
+                  if c in odds_cache.columns]
+    if "match_id" in _odds_keep:
+        _odds_sub = odds_cache[_odds_keep].copy()
+        _odds_sub["match_id"] = pd.to_numeric(_odds_sub["match_id"], errors="coerce")
+        merged = merged.merge(_odds_sub, on="match_id", how="left")
 
 # ── Filtreler ────────────────────────────────────────────────────────────────
 groups = sorted(merged["group"].unique())
@@ -181,6 +200,36 @@ for _, match in view_df.iterrows():
         xg_main = "—"
         xg_sub  = ""
 
+    # Bahis oranları
+    try:
+        _oh = match.get("odds_home")
+        _od = match.get("odds_draw")
+        _oa = match.get("odds_away")
+        _ih = match.get("implied_home")
+        _ia = match.get("implied_away")
+        has_odds = (
+            _oh is not None and not (isinstance(_oh, float) and pd.isna(_oh))
+        )
+        if has_odds:
+            _oh = float(_oh)
+            _od = float(_od) if (_od is not None and not (isinstance(_od, float) and pd.isna(_od))) else 0.0
+            _oa = float(_oa)
+            _ih = float(_ih) if (_ih is not None and not (isinstance(_ih, float) and pd.isna(_ih))) else 0.0
+            _ia = float(_ia) if (_ia is not None and not (isinstance(_ia, float) and pd.isna(_ia))) else 0.0
+            odds_display = f"🎰 {_oh:.2f} / {_od:.2f} / {_oa:.2f}"
+            if has_pred and _ih > 0 and _ia > 0:
+                value_h = (ph or 0) - _ih
+                value_a = (pa or 0) - _ia
+                if value_h > 0.08:
+                    odds_display += f"  🟩 VALUE Ev +{value_h:.0%}"
+                elif value_a > 0.08:
+                    odds_display += f"  🟩 VALUE Dep +{value_a:.0%}"
+        else:
+            odds_display = ""
+    except Exception:
+        has_odds = False
+        odds_display = ""
+
     # ── Satır 1: maç bilgisi ──────────────────────────────────────────────
     row = st.columns([0.4, 0.5, 2.0, 2.0, 2.2, 1.6, 1.5, 1.2, 0.6])
     row[0].markdown(badge)
@@ -195,6 +244,9 @@ for _, match in view_df.iterrows():
     row[6].markdown(f"**{fav_label}**")
     row[7].markdown(score_str)
     row[8].markdown(gf_str)
+
+    if odds_display:
+        st.caption(odds_display)
 
     # ── Satır 2: inline skor girişi ───────────────────────────────────────
     edit_key = f"edit_{mid}"

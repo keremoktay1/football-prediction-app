@@ -1,0 +1,49 @@
+team,cluster_id,cluster_label,elo_rating,attack_strength,defense_weakness
+Algeria,4,Solid Teams,1743.0,1.5556,0.4444
+Argentina,3,Elite Favorites,2113.0,1.6296,0.3333
+Australia,0,Dark Horses,1783.0,1.0741,0.6296
+Austria,3,Elite Favorites,1827.0,1.6667,0.5556
+Belgium,3,Elite Favorites,1867.0,1.9259,0.8148
+Bosnia and Herzegovina,2,Underdogs,1594.0,1.0741,1.1111
+Brazil,1,Strong Contenders,1984.0,1.4074,0.7407
+Cabo Verde,0,Dark Horses,1549.0,1.0,0.7037
+Canada,4,Solid Teams,1784.0,1.1481,0.4074
+Colombia,1,Strong Contenders,1975.0,1.4074,0.8148
+Croatia,1,Strong Contenders,1930.0,1.5185,0.7778
+Curaçao,2,Underdogs,1436.0,1.4815,0.7778
+Czechia,1,Strong Contenders,1726.0,1.4815,0.8519
+Côte d'Ivoire,4,Solid Teams,1676.0,1.3333,0.3704
+DR Congo,4,Solid Teams,1655.0,1.037,0.4074
+Ecuador,4,Solid Teams,1933.0,0.7407,0.2593
+Egypt,0,Dark Horses,1689.0,0.8889,0.5556
+England,3,Elite Favorites,2020.0,1.6667,0.3704
+France,3,Elite Favorites,2081.0,1.6667,0.8148
+Germany,3,Elite Favorites,1923.0,1.9259,0.7407
+Ghana,2,Underdogs,1503.0,1.0,0.8519
+Haiti,2,Underdogs,1532.0,1.6667,0.8519
+Iran,4,Solid Teams,1760.0,1.3704,0.5556
+Iraq,0,Dark Horses,1607.0,0.7778,0.7407
+Japan,3,Elite Favorites,1904.0,1.7778,0.3333
+Jordan,2,Underdogs,1690.0,1.1111,1.1111
+Mexico,4,Solid Teams,1860.0,1.0741,0.5185
+Morocco,4,Solid Teams,1822.0,1.5185,0.2593
+Netherlands,3,Elite Favorites,1961.0,1.8519,0.7407
+New Zealand,2,Underdogs,1585.0,1.5926,0.9259
+Norway,3,Elite Favorites,1912.0,2.1852,0.6296
+Panama,1,Strong Contenders,1737.0,1.3704,0.8519
+Paraguay,0,Dark Horses,1833.0,0.9259,0.6667
+Portugal,3,Elite Favorites,1984.0,1.7037,0.7037
+Qatar,2,Underdogs,1425.0,0.8148,1.2963
+Saudi Arabia,2,Underdogs,1568.0,0.8148,0.9259
+Scotland,1,Strong Contenders,1767.0,1.2593,0.8889
+Senegal,3,Elite Favorites,1878.0,1.7407,0.5556
+South Africa,0,Dark Horses,1524.0,1.0741,0.5556
+South Korea,1,Strong Contenders,1752.0,1.2963,0.7037
+Spain,3,Elite Favorites,2165.0,1.963,0.7037
+Sweden,1,Strong Contenders,1719.0,1.5926,1.0741
+Switzerland,1,Strong Contenders,1889.0,1.4815,0.963
+Tunisia,2,Underdogs,1636.0,1.2222,0.7778
+Turkey,1,Strong Contenders,1902.0,1.5556,0.8148
+United States,2,Underdogs,1721.0,1.2222,1.1852
+Uruguay,0,Dark Horses,1892.0,0.6296,0.6296
+Uzbekistan,0,Dark Horses,1727.0,0.9259,0.5926

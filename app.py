@@ -1,6 +1,7 @@
 """
 app.py — FIFA 2026 Tahmin Platformu ana Streamlit girişi.
 """
+import datetime
 import os
 import subprocess
 import sys
@@ -77,8 +78,42 @@ _has_updates = (
     and len(_updates_for_btn) > 0
 )
 
+_comp_path = os.path.join(APP_DIR, "data", "processed", "model_comparison.csv")
+
 if _has_updates:
+    # Son eğitim tarihi
+    _last_trained_str = ""
+    if os.path.isfile(_comp_path):
+        try:
+            _mtime   = os.path.getmtime(_comp_path)
+            _dt      = datetime.datetime.fromtimestamp(_mtime)
+            _days_ago = (datetime.datetime.now() - _dt).days
+            _last_trained_str = f"Son eğitim: {_days_ago} gün önce"
+        except Exception:
+            pass
+
     st.sidebar.markdown(f"**{len(_updates_for_btn)} skor girildi** — model güncellenebilir")
+    if _last_trained_str:
+        st.sidebar.caption(_last_trained_str)
+
+    with st.sidebar.expander("📊 Eğitim Detayları", expanded=False):
+        if os.path.isfile(_comp_path):
+            try:
+                _comp = pd.read_csv(_comp_path)
+                for _model_name in ["Ensemble", "LR", "Random Forest"]:
+                    _row = _comp[(_comp["model"] == _model_name) & (_comp["split"] == "test")]
+                    if not _row.empty:
+                        r = _row.iloc[0]
+                        st.write(
+                            f"**{_model_name}** — "
+                            f"LL: {r['log_loss']:.4f} | "
+                            f"Acc: {float(r['accuracy'])*100:.1f}%"
+                        )
+            except Exception:
+                st.caption("Metrikler okunamadı.")
+        else:
+            st.caption("model_comparison.csv bulunamadı.")
+
     if st.sidebar.button("🔄 Modeli Yeniden Eğit", key="retrain_btn"):
         _script = os.path.join(APP_DIR, "scripts", "fast_model_training.py")
         with st.sidebar.spinner("Model eğitiliyor..."):
@@ -87,13 +122,14 @@ if _has_updates:
                 capture_output=True, text=True, cwd=APP_DIR,
             )
         if _result.returncode == 0:
-            st.sidebar.success("✅ Model yeniden eğitildi!")
+            st.sidebar.success(
+                f"✅ Model yeniden eğitildi — {len(_updates_for_btn)} WC maçı dahil!"
+            )
             try:
-                _comp_path = os.path.join(APP_DIR, "data", "processed", "model_comparison.csv")
-                _comp = pd.read_csv(_comp_path)
-                _row = _comp[(_comp["model"] == "Ensemble") & (_comp["split"] == "test")]
-                if not _row.empty:
-                    _acc = float(_row.iloc[0]["accuracy"]) * 100
+                _comp2 = pd.read_csv(_comp_path)
+                _row2  = _comp2[(_comp2["model"] == "Ensemble") & (_comp2["split"] == "test")]
+                if not _row2.empty:
+                    _acc = float(_row2.iloc[0]["accuracy"]) * 100
                     st.sidebar.info(f"Ensemble doğruluğu: **{_acc:.1f}%**")
             except Exception:
                 pass
@@ -102,6 +138,42 @@ if _has_updates:
             st.sidebar.error(f"❌ Eğitim hatası:\n```\n{_result.stderr[-600:]}\n```")
 else:
     st.sidebar.caption("💡 Skor girin → model yeniden eğitilebilir")
+
+st.sidebar.markdown("---")
+
+# ── Bahis Oranları ────────────────────────────────────────────────────────────
+with st.sidebar.expander("📡 Bahis Oranları", expanded=False):
+    _api_key = os.environ.get("ODDS_API_KEY", "").strip()
+    if not _api_key:
+        try:
+            _api_key = str(st.secrets.get("ODDS_API_KEY", "")).strip()
+        except Exception:
+            _api_key = ""
+
+    if _api_key:
+        if st.button("📡 Odds Güncelle", key="fetch_odds_btn"):
+            _odds_script = os.path.join(APP_DIR, "scripts", "fetch_odds.py")
+            with st.spinner("Bahis oranları çekiliyor..."):
+                _env = {**os.environ, "ODDS_API_KEY": _api_key}
+                _res = subprocess.run(
+                    [sys.executable, _odds_script],
+                    capture_output=True, text=True, cwd=APP_DIR, env=_env,
+                )
+            if _res.returncode == 0:
+                st.success("✅ Bahis oranları güncellendi!")
+            else:
+                st.error(f"Hata:\n```\n{_res.stderr[-300:]}\n```")
+        # Son güncelleme zamanı
+        _odds_cache_path = os.path.join(APP_DIR, "data", "processed", "odds_cache.csv")
+        if os.path.isfile(_odds_cache_path):
+            try:
+                _omtime = datetime.datetime.fromtimestamp(os.path.getmtime(_odds_cache_path))
+                st.caption(f"Son güncelleme: {_omtime.strftime('%d.%m.%Y %H:%M')}")
+            except Exception:
+                pass
+    else:
+        st.info("`.streamlit/secrets.toml`'a `ODDS_API_KEY = '...'` ekleyin.")
+        st.caption("Ücretsiz API: the-odds-api.com (500 istek/ay)")
 
 st.sidebar.markdown("---")
 
