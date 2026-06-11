@@ -71,78 +71,78 @@ match_id,group,home_team,away_team,model,p_home,p_draw,p_away,lambda_home,lambda
 70,K,DR Congo,Uzbekistan,Elo Baseline,0.3103,0.22,0.4697,,
 71,J,Algeria,Austria,Elo Baseline,0.2975,0.22,0.4825,,
 72,J,Jordan,Argentina,Elo Baseline,0.0628,0.22,0.7172,,
-1,A,Mexico,South Africa,LR,0.3793,0.4924,0.1283,,
-2,A,South Korea,Czechia,LR,0.1947,0.3783,0.427,,
-3,B,Canada,Bosnia and Herzegovina,LR,0.2661,0.4232,0.3107,,
-4,D,United States,Paraguay,LR,0.255,0.367,0.378,,
-5,D,Australia,Turkey,LR,0.1203,0.3596,0.5201,,
-6,B,Qatar,Switzerland,LR,0.0556,0.2373,0.7072,,
-7,C,Brazil,Morocco,LR,0.3894,0.3915,0.2191,,
-8,C,Haiti,Scotland,LR,0.1186,0.3128,0.5686,,
-9,E,Germany,Curaçao,LR,0.7489,0.2209,0.0302,,
-10,F,Netherlands,Japan,LR,0.3578,0.4231,0.2191,,
-11,E,Côte d'Ivoire,Ecuador,LR,0.3093,0.4285,0.2622,,
-12,F,Sweden,Tunisia,LR,0.2997,0.3289,0.3713,,
-13,H,Spain,Cabo Verde,LR,0.6219,0.2761,0.102,,
-14,G,Belgium,Egypt,LR,0.3871,0.458,0.1549,,
-15,H,Saudi Arabia,Uruguay,LR,0.1109,0.3331,0.556,,
-16,G,Iran,New Zealand,LR,0.5378,0.387,0.0752,,
-17,J,Austria,Jordan,LR,0.4929,0.3803,0.1268,,
-18,I,France,Senegal,LR,0.4007,0.2931,0.3061,,
-19,I,Iraq,Norway,LR,0.063,0.2448,0.6922,,
-20,J,Argentina,Algeria,LR,0.4708,0.4512,0.078,,
-21,K,Portugal,DR Congo,LR,0.5429,0.3707,0.0864,,
-22,L,England,Croatia,LR,0.4613,0.3251,0.2137,,
-23,L,Ghana,Panama,LR,0.2572,0.3761,0.3667,,
-24,K,Uzbekistan,Colombia,LR,0.0384,0.322,0.6396,,
-25,A,Czechia,South Africa,LR,0.3557,0.4226,0.2218,,
-26,B,Switzerland,Bosnia and Herzegovina,LR,0.394,0.3173,0.2887,,
-27,B,Canada,Qatar,LR,0.3545,0.4804,0.1651,,
-28,A,Mexico,South Korea,LR,0.3433,0.4818,0.175,,
-29,D,Turkey,Paraguay,LR,0.3451,0.4256,0.2293,,
-30,D,United States,Australia,LR,0.2936,0.3666,0.3398,,
-31,C,Scotland,Morocco,LR,0.1367,0.3819,0.4814,,
-32,C,Brazil,Haiti,LR,0.6999,0.2579,0.0422,,
-33,F,Tunisia,Japan,LR,0.0781,0.4163,0.5057,,
-34,F,Netherlands,Sweden,LR,0.4801,0.3084,0.2115,,
-35,E,Germany,Côte d'Ivoire,LR,0.4658,0.3778,0.1564,,
-36,E,Ecuador,Curaçao,LR,0.4442,0.4846,0.0712,,
-37,H,Spain,Saudi Arabia,LR,0.6775,0.2667,0.0558,,
-38,G,Belgium,Iran,LR,0.3786,0.4265,0.1949,,
-39,H,Uruguay,Cabo Verde,LR,0.4344,0.3769,0.1887,,
-40,G,New Zealand,Egypt,LR,0.1335,0.3806,0.4859,,
-41,J,Argentina,Austria,LR,0.4577,0.4076,0.1347,,
-42,I,France,Iraq,LR,0.7089,0.2234,0.0677,,
-43,I,Norway,Senegal,LR,0.271,0.3324,0.3966,,
-44,J,Jordan,Algeria,LR,0.1198,0.3748,0.5054,,
-45,K,Portugal,Uzbekistan,LR,0.6278,0.2621,0.1101,,
-46,L,England,Ghana,LR,0.5282,0.3786,0.0932,,
-47,L,Panama,Croatia,LR,0.0943,0.279,0.6267,,
-48,K,Colombia,DR Congo,LR,0.508,0.3833,0.1087,,
-49,B,Switzerland,Canada,LR,0.4091,0.3696,0.2213,,
-50,B,Bosnia and Herzegovina,Qatar,LR,0.4437,0.3243,0.232,,
-51,C,Scotland,Brazil,LR,0.037,0.2005,0.7626,,
-52,C,Morocco,Haiti,LR,0.562,0.3605,0.0774,,
-53,A,Czechia,Mexico,LR,0.1986,0.4267,0.3747,,
-54,A,South Africa,South Korea,LR,0.1551,0.4468,0.3981,,
-55,E,Curaçao,Côte d'Ivoire,LR,0.033,0.2997,0.6673,,
-56,E,Ecuador,Germany,LR,0.0824,0.3293,0.5882,,
-57,F,Japan,Sweden,LR,0.4187,0.3991,0.1823,,
-58,F,Tunisia,Netherlands,LR,0.0612,0.2548,0.684,,
-59,D,United States,Turkey,LR,0.117,0.3034,0.5796,,
-60,D,Paraguay,Australia,LR,0.2706,0.4518,0.2776,,
-61,I,Norway,France,LR,0.0682,0.1655,0.7663,,
-62,I,Senegal,Iraq,LR,0.4878,0.352,0.1603,,
-63,H,Cabo Verde,Saudi Arabia,LR,0.2308,0.4298,0.3394,,
-64,H,Uruguay,Spain,LR,0.0364,0.2021,0.7615,,
-65,G,Egypt,Iran,LR,0.1759,0.4916,0.3325,,
-66,G,New Zealand,Belgium,LR,0.0293,0.2096,0.7612,,
-67,L,Panama,England,LR,0.022,0.1852,0.7928,,
-68,L,Croatia,Ghana,LR,0.4136,0.4095,0.177,,
-69,K,Colombia,Portugal,LR,0.2018,0.3694,0.4288,,
-70,K,DR Congo,Uzbekistan,LR,0.1982,0.3442,0.4576,,
-71,J,Algeria,Austria,LR,0.1548,0.4579,0.3873,,
-72,J,Jordan,Argentina,LR,0.0141,0.2486,0.7373,,
+1,A,Mexico,South Africa,LR,0.4188,0.4857,0.0955,,
+2,A,South Korea,Czechia,LR,0.1992,0.393,0.4078,,
+3,B,Canada,Bosnia and Herzegovina,LR,0.2262,0.4986,0.2751,,
+4,D,United States,Paraguay,LR,0.2449,0.3812,0.3739,,
+5,D,Australia,Turkey,LR,0.1579,0.3238,0.5183,,
+6,B,Qatar,Switzerland,LR,0.0476,0.2259,0.7265,,
+7,C,Brazil,Morocco,LR,0.36,0.4403,0.1997,,
+8,C,Haiti,Scotland,LR,0.1179,0.3291,0.553,,
+9,E,Germany,Curaçao,LR,0.746,0.2261,0.0279,,
+10,F,Netherlands,Japan,LR,0.3329,0.4213,0.2458,,
+11,E,Côte d'Ivoire,Ecuador,LR,0.2946,0.4372,0.2683,,
+12,F,Sweden,Tunisia,LR,0.2828,0.3186,0.3986,,
+13,H,Spain,Cabo Verde,LR,0.6044,0.2545,0.1411,,
+14,G,Belgium,Egypt,LR,0.4301,0.4402,0.1297,,
+15,H,Saudi Arabia,Uruguay,LR,0.0834,0.2506,0.666,,
+16,G,Iran,New Zealand,LR,0.4974,0.4223,0.0804,,
+17,J,Austria,Jordan,LR,0.5497,0.3449,0.1054,,
+18,I,France,Senegal,LR,0.3925,0.311,0.2966,,
+19,I,Iraq,Norway,LR,0.0759,0.277,0.6471,,
+20,J,Argentina,Algeria,LR,0.4896,0.4351,0.0753,,
+21,K,Portugal,DR Congo,LR,0.5569,0.3523,0.0908,,
+22,L,England,Croatia,LR,0.3886,0.3643,0.2471,,
+23,L,Ghana,Panama,LR,0.2615,0.38,0.3585,,
+24,K,Uzbekistan,Colombia,LR,0.0401,0.2808,0.6791,,
+25,A,Czechia,South Africa,LR,0.3553,0.4382,0.2065,,
+26,B,Switzerland,Bosnia and Herzegovina,LR,0.4387,0.2937,0.2676,,
+27,B,Canada,Qatar,LR,0.294,0.5595,0.1465,,
+28,A,Mexico,South Korea,LR,0.3826,0.4792,0.1382,,
+29,D,Turkey,Paraguay,LR,0.32,0.4457,0.2343,,
+30,D,United States,Australia,LR,0.2654,0.3281,0.4065,,
+31,C,Scotland,Morocco,LR,0.133,0.4441,0.4229,,
+32,C,Brazil,Haiti,LR,0.6736,0.287,0.0394,,
+33,F,Tunisia,Japan,LR,0.0783,0.3891,0.5326,,
+34,F,Netherlands,Sweden,LR,0.4882,0.3025,0.2093,,
+35,E,Germany,Côte d'Ivoire,LR,0.4775,0.3887,0.1337,,
+36,E,Ecuador,Curaçao,LR,0.4526,0.4832,0.0642,,
+37,H,Spain,Saudi Arabia,LR,0.7075,0.2375,0.055,,
+38,G,Belgium,Iran,LR,0.4029,0.4109,0.1862,,
+39,H,Uruguay,Cabo Verde,LR,0.4198,0.3545,0.2258,,
+40,G,New Zealand,Egypt,LR,0.1554,0.5199,0.3247,,
+41,J,Argentina,Austria,LR,0.4636,0.3843,0.1521,,
+42,I,France,Iraq,LR,0.7123,0.2229,0.0648,,
+43,I,Norway,Senegal,LR,0.2358,0.3488,0.4155,,
+44,J,Jordan,Algeria,LR,0.1013,0.3534,0.5452,,
+45,K,Portugal,Uzbekistan,LR,0.6219,0.2399,0.1382,,
+46,L,England,Ghana,LR,0.5192,0.386,0.0948,,
+47,L,Panama,Croatia,LR,0.0787,0.2945,0.6269,,
+48,K,Colombia,DR Congo,LR,0.5291,0.3607,0.1102,,
+49,B,Switzerland,Canada,LR,0.4739,0.3584,0.1677,,
+50,B,Bosnia and Herzegovina,Qatar,LR,0.443,0.3376,0.2194,,
+51,C,Scotland,Brazil,LR,0.0399,0.2338,0.7263,,
+52,C,Morocco,Haiti,LR,0.5474,0.3816,0.071,,
+53,A,Czechia,Mexico,LR,0.1394,0.4497,0.4109,,
+54,A,South Africa,South Korea,LR,0.1455,0.4856,0.3689,,
+55,E,Curaçao,Côte d'Ivoire,LR,0.0386,0.3519,0.6095,,
+56,E,Ecuador,Germany,LR,0.0882,0.3383,0.5735,,
+57,F,Japan,Sweden,LR,0.4604,0.363,0.1766,,
+58,F,Tunisia,Netherlands,LR,0.07,0.2447,0.6853,,
+59,D,United States,Turkey,LR,0.1265,0.3157,0.5577,,
+60,D,Paraguay,Australia,LR,0.2519,0.4016,0.3466,,
+61,I,Norway,France,LR,0.053,0.1731,0.7739,,
+62,I,Senegal,Iraq,LR,0.4868,0.3579,0.1553,,
+63,H,Cabo Verde,Saudi Arabia,LR,0.2996,0.3922,0.3082,,
+64,H,Uruguay,Spain,LR,0.0417,0.2122,0.7461,,
+65,G,Egypt,Iran,LR,0.1593,0.5016,0.3391,,
+66,G,New Zealand,Belgium,LR,0.0324,0.2736,0.694,,
+67,L,Panama,England,LR,0.0255,0.2068,0.7677,,
+68,L,Croatia,Ghana,LR,0.4239,0.4234,0.1527,,
+69,K,Colombia,Portugal,LR,0.1974,0.3106,0.492,,
+70,K,DR Congo,Uzbekistan,LR,0.1838,0.3186,0.4976,,
+71,J,Algeria,Austria,LR,0.1472,0.4161,0.4366,,
+72,J,Jordan,Argentina,LR,0.0095,0.2018,0.7887,,
 1,A,Mexico,South Africa,Poisson,0.4642,0.3353,0.2005,1.047,0.578
 2,A,South Korea,Czechia,Poisson,0.4118,0.2468,0.3414,1.53,1.372
 3,B,Canada,Bosnia and Herzegovina,Poisson,0.7409,0.181,0.0781,2.049,0.496
@@ -215,219 +215,219 @@ match_id,group,home_team,away_team,model,p_home,p_draw,p_away,lambda_home,lambda
 70,K,DR Congo,Uzbekistan,Poisson,0.3713,0.393,0.2357,0.77,0.549
 71,J,Algeria,Austria,Poisson,0.347,0.2945,0.3586,1.069,1.092
 72,J,Jordan,Argentina,Poisson,0.0154,0.0574,0.9271,0.35,3.492
-1,A,Mexico,South Africa,Ensemble,0.3154,0.566,0.1187,1.047,0.578
-2,A,South Korea,Czechia,Ensemble,0.1962,0.4093,0.3944,1.53,1.372
-3,B,Canada,Bosnia and Herzegovina,Ensemble,0.3118,0.4165,0.2717,2.049,0.496
-4,D,United States,Paraguay,Ensemble,0.2332,0.3425,0.4244,0.977,1.668
-5,D,Australia,Turkey,Ensemble,0.1823,0.3549,0.4629,1.041,1.501
-6,B,Qatar,Switzerland,Ensemble,0.0702,0.1942,0.7356,0.741,3.704
-7,C,Brazil,Morocco,Ensemble,0.4531,0.3439,0.203,0.572,1.307
-8,C,Haiti,Scotland,Ensemble,0.1051,0.2684,0.6265,1.53,1.893
-9,E,Germany,Curaçao,Ensemble,0.8142,0.1613,0.0245,2.629,1.14
-10,F,Netherlands,Japan,Ensemble,0.4171,0.3863,0.1967,0.881,1.682
-11,E,Côte d'Ivoire,Ecuador,Ensemble,0.3417,0.3873,0.271,0.347,0.498
-12,F,Sweden,Tunisia,Ensemble,0.3258,0.2958,0.3784,1.811,1.636
-13,H,Spain,Cabo Verde,Ensemble,0.6655,0.2382,0.0962,2.424,0.731
-14,G,Belgium,Egypt,Ensemble,0.433,0.4248,0.1422,1.702,0.83
-15,H,Saudi Arabia,Uruguay,Ensemble,0.106,0.2861,0.6079,0.485,1.124
-16,G,Iran,New Zealand,Ensemble,0.617,0.3087,0.0744,2.013,1.017
-17,J,Austria,Jordan,Ensemble,0.5877,0.2919,0.1204,2.843,0.733
-18,I,France,Senegal,Ensemble,0.4898,0.2442,0.266,1.504,1.592
-19,I,Iraq,Norway,Ensemble,0.0745,0.2566,0.6689,0.463,3.122
-20,J,Argentina,Algeria,Ensemble,0.5464,0.3915,0.0621,1.271,0.538
-21,K,Portugal,DR Congo,Ensemble,0.5982,0.3096,0.0922,1.218,0.758
-22,L,England,Croatia,Ensemble,0.4727,0.3235,0.2038,1.908,0.697
-23,L,Ghana,Panama,Ensemble,0.3051,0.3804,0.3144,0.881,2.058
-24,K,Uzbekistan,Colombia,Ensemble,0.0552,0.3516,0.5931,0.766,1.497
-25,A,Czechia,South Africa,Ensemble,0.4901,0.3341,0.1758,1.336,1.028
-26,B,Switzerland,Bosnia and Herzegovina,Ensemble,0.3901,0.3369,0.2729,2.878,1.078
-27,B,Canada,Qatar,Ensemble,0.3425,0.5061,0.1514,2.612,0.345
-28,A,Mexico,South Korea,Ensemble,0.3114,0.5004,0.1883,1.131,0.819
-29,D,Turkey,Paraguay,Ensemble,0.3202,0.4409,0.2389,1.497,0.953
-30,D,United States,Australia,Ensemble,0.2754,0.3461,0.3785,0.974,1.832
-31,C,Scotland,Morocco,Ensemble,0.1512,0.3652,0.4836,0.417,1.928
-32,C,Brazil,Haiti,Ensemble,0.7565,0.205,0.0385,2.104,1.282
-33,F,Tunisia,Japan,Ensemble,0.0787,0.4145,0.5068,0.403,2.55
-34,F,Netherlands,Sweden,Ensemble,0.5422,0.3027,0.1551,3.335,1.282
-35,E,Germany,Côte d'Ivoire,Ensemble,0.5843,0.2946,0.1211,1.201,1.069
-36,E,Ecuador,Curaçao,Ensemble,0.512,0.4208,0.0673,1.011,0.399
-37,H,Spain,Saudi Arabia,Ensemble,0.7115,0.242,0.0465,3.19,0.595
-38,G,Belgium,Iran,Ensemble,0.3849,0.429,0.1861,1.599,1.362
-39,H,Uruguay,Cabo Verde,Ensemble,0.4055,0.4345,0.1601,0.778,0.654
-40,G,New Zealand,Egypt,Ensemble,0.141,0.3534,0.5056,1.07,1.24
-41,J,Argentina,Austria,Ensemble,0.5828,0.3141,0.1031,1.572,0.583
-42,I,France,Iraq,Ensemble,0.7505,0.1955,0.054,2.167,0.658
-43,I,Norway,Senegal,Ensemble,0.2456,0.2987,0.4557,1.695,1.431
-44,J,Jordan,Algeria,Ensemble,0.1391,0.3466,0.5143,0.631,2.464
-45,K,Portugal,Uzbekistan,Ensemble,0.6554,0.2315,0.1131,1.713,0.7
-46,L,England,Ghana,Ensemble,0.539,0.3655,0.0955,2.492,0.385
-47,L,Panama,Croatia,Ensemble,0.1138,0.3099,0.5763,1.161,2.164
-48,K,Colombia,DR Congo,Ensemble,0.5912,0.3053,0.1035,1.006,0.877
-49,B,Switzerland,Canada,Ensemble,0.4247,0.3457,0.2296,0.9,1.351
-50,B,Bosnia and Herzegovina,Qatar,Ensemble,0.4969,0.2918,0.2113,2.197,1.045
-51,C,Scotland,Brazil,Ensemble,0.0549,0.195,0.7502,0.986,2.157
-52,C,Morocco,Haiti,Ensemble,0.5893,0.3248,0.0859,2.253,0.452
-53,A,Czechia,Mexico,Ensemble,0.2061,0.3868,0.4071,0.898,1.426
-54,A,South Africa,South Korea,Ensemble,0.1655,0.3918,0.4426,0.788,1.259
-55,E,Curaçao,Côte d'Ivoire,Ensemble,0.0316,0.2614,0.707,0.563,1.842
-56,E,Ecuador,Germany,Ensemble,0.1433,0.2773,0.5794,0.748,0.667
-57,F,Japan,Sweden,Ensemble,0.5075,0.3355,0.157,3.055,0.605
-58,F,Tunisia,Netherlands,Ensemble,0.0479,0.211,0.7411,0.855,2.778
-59,D,United States,Turkey,Ensemble,0.1281,0.2853,0.5866,1.101,3.039
-60,D,Paraguay,Australia,Ensemble,0.2702,0.474,0.2558,0.826,0.921
-61,I,Norway,France,Ensemble,0.0756,0.2165,0.7079,1.997,1.705
-62,I,Senegal,Iraq,Ensemble,0.5603,0.2967,0.1431,2.212,0.459
-63,H,Cabo Verde,Saudi Arabia,Ensemble,0.263,0.4104,0.3266,1.226,0.789
-64,H,Uruguay,Spain,Ensemble,0.0481,0.1679,0.784,0.435,2.295
-65,G,Egypt,Iran,Ensemble,0.1964,0.4811,0.3224,0.619,1.106
-66,G,New Zealand,Belgium,Ensemble,0.0264,0.2277,0.7459,1.258,3.353
-67,L,Panama,England,Ensemble,0.0362,0.2115,0.7523,0.491,2.673
-68,L,Croatia,Ghana,Ensemble,0.4071,0.3945,0.1983,2.27,0.808
-69,K,Colombia,Portugal,Ensemble,0.1702,0.3195,0.5103,1.325,1.891
-70,K,DR Congo,Uzbekistan,Ensemble,0.2196,0.3457,0.4347,0.77,0.549
-71,J,Algeria,Austria,Ensemble,0.1883,0.4169,0.3949,1.069,1.092
-72,J,Jordan,Argentina,Ensemble,0.0241,0.2368,0.7392,0.35,3.492
-1,A,Mexico,South Africa,Random Forest,0.4515,0.3767,0.1718,,
-2,A,South Korea,Czechia,Random Forest,0.248,0.4341,0.3179,,
-3,B,Canada,Bosnia and Herzegovina,Random Forest,0.3478,0.4167,0.2355,,
-4,D,United States,Paraguay,Random Forest,0.3622,0.3102,0.3276,,
-5,D,Australia,Turkey,Random Forest,0.2476,0.4136,0.3388,,
-6,B,Qatar,Switzerland,Random Forest,0.1955,0.2609,0.5437,,
-7,C,Brazil,Morocco,Random Forest,0.5614,0.2707,0.1678,,
-8,C,Haiti,Scotland,Random Forest,0.1812,0.3502,0.4686,,
-9,E,Germany,Curaçao,Random Forest,0.6893,0.1988,0.1119,,
-10,F,Netherlands,Japan,Random Forest,0.5402,0.291,0.1687,,
-11,E,Côte d'Ivoire,Ecuador,Random Forest,0.3667,0.3704,0.2629,,
-12,F,Sweden,Tunisia,Random Forest,0.3777,0.3042,0.318,,
-13,H,Spain,Cabo Verde,Random Forest,0.6282,0.2672,0.1046,,
-14,G,Belgium,Egypt,Random Forest,0.442,0.4062,0.1518,,
-15,H,Saudi Arabia,Uruguay,Random Forest,0.1964,0.3467,0.457,,
-16,G,Iran,New Zealand,Random Forest,0.6019,0.2719,0.1262,,
-17,J,Austria,Jordan,Random Forest,0.5328,0.3009,0.1663,,
-18,I,France,Senegal,Random Forest,0.5086,0.2555,0.2359,,
-19,I,Iraq,Norway,Random Forest,0.1419,0.3233,0.5349,,
-20,J,Argentina,Algeria,Random Forest,0.527,0.3706,0.1025,,
-21,K,Portugal,DR Congo,Random Forest,0.5713,0.3015,0.1272,,
-22,L,England,Croatia,Random Forest,0.4829,0.3474,0.1697,,
-23,L,Ghana,Panama,Random Forest,0.4173,0.3217,0.261,,
-24,K,Uzbekistan,Colombia,Random Forest,0.1377,0.3708,0.4914,,
-25,A,Czechia,South Africa,Random Forest,0.5218,0.3129,0.1653,,
-26,B,Switzerland,Bosnia and Herzegovina,Random Forest,0.4909,0.3005,0.2086,,
-27,B,Canada,Qatar,Random Forest,0.4659,0.358,0.1762,,
-28,A,Mexico,South Korea,Random Forest,0.3776,0.4117,0.2107,,
-29,D,Turkey,Paraguay,Random Forest,0.3413,0.437,0.2217,,
-30,D,United States,Australia,Random Forest,0.3295,0.3084,0.362,,
-31,C,Scotland,Morocco,Random Forest,0.2148,0.3412,0.4441,,
-32,C,Brazil,Haiti,Random Forest,0.6691,0.2389,0.092,,
-33,F,Tunisia,Japan,Random Forest,0.2254,0.4001,0.3745,,
-34,F,Netherlands,Sweden,Random Forest,0.5112,0.3649,0.1238,,
-35,E,Germany,Côte d'Ivoire,Random Forest,0.6122,0.2634,0.1244,,
-36,E,Ecuador,Curaçao,Random Forest,0.5819,0.2901,0.128,,
-37,H,Spain,Saudi Arabia,Random Forest,0.694,0.2118,0.0942,,
-38,G,Belgium,Iran,Random Forest,0.5424,0.3246,0.133,,
-39,H,Uruguay,Cabo Verde,Random Forest,0.4095,0.3688,0.2217,,
-40,G,New Zealand,Egypt,Random Forest,0.1702,0.3882,0.4415,,
-41,J,Argentina,Austria,Random Forest,0.6143,0.2758,0.1098,,
-42,I,France,Iraq,Random Forest,0.6684,0.2257,0.1059,,
-43,I,Norway,Senegal,Random Forest,0.262,0.3214,0.4166,,
-44,J,Jordan,Algeria,Random Forest,0.1763,0.3663,0.4574,,
-45,K,Portugal,Uzbekistan,Random Forest,0.6182,0.2655,0.1163,,
-46,L,England,Ghana,Random Forest,0.6022,0.2678,0.13,,
-47,L,Panama,Croatia,Random Forest,0.191,0.3639,0.4451,,
-48,K,Colombia,DR Congo,Random Forest,0.5813,0.2771,0.1416,,
-49,B,Switzerland,Canada,Random Forest,0.4381,0.3345,0.2275,,
-50,B,Bosnia and Herzegovina,Qatar,Random Forest,0.454,0.3317,0.2143,,
-51,C,Scotland,Brazil,Random Forest,0.1229,0.2928,0.5843,,
-52,C,Morocco,Haiti,Random Forest,0.5933,0.2812,0.1255,,
-53,A,Czechia,Mexico,Random Forest,0.2868,0.3471,0.3661,,
-54,A,South Africa,South Korea,Random Forest,0.2258,0.37,0.4042,,
-55,E,Curaçao,Côte d'Ivoire,Random Forest,0.089,0.3544,0.5566,,
-56,E,Ecuador,Germany,Random Forest,0.1441,0.2901,0.5659,,
-57,F,Japan,Sweden,Random Forest,0.4093,0.3805,0.2102,,
-58,F,Tunisia,Netherlands,Random Forest,0.0948,0.2338,0.6714,,
-59,D,United States,Turkey,Random Forest,0.2264,0.3336,0.4401,,
-60,D,Paraguay,Australia,Random Forest,0.3098,0.3955,0.2947,,
-61,I,Norway,France,Random Forest,0.1187,0.3165,0.5648,,
-62,I,Senegal,Iraq,Random Forest,0.5468,0.291,0.1622,,
-63,H,Cabo Verde,Saudi Arabia,Random Forest,0.3512,0.3835,0.2653,,
-64,H,Uruguay,Spain,Random Forest,0.0978,0.2182,0.684,,
-65,G,Egypt,Iran,Random Forest,0.2446,0.4534,0.3021,,
-66,G,New Zealand,Belgium,Random Forest,0.0769,0.2867,0.6364,,
-67,L,Panama,England,Random Forest,0.0941,0.2732,0.6327,,
-68,L,Croatia,Ghana,Random Forest,0.4463,0.3359,0.2178,,
-69,K,Colombia,Portugal,Random Forest,0.1873,0.3347,0.478,,
-70,K,DR Congo,Uzbekistan,Random Forest,0.248,0.3973,0.3546,,
-71,J,Algeria,Austria,Random Forest,0.2552,0.3859,0.3589,,
-72,J,Jordan,Argentina,Random Forest,0.0733,0.2898,0.6368,,
-1,A,Mexico,South Africa,LightGBM,0.2,0.6988,0.1012,,
-2,A,South Korea,Czechia,LightGBM,0.199,0.4654,0.3356,,
-3,B,Canada,Bosnia and Herzegovina,LightGBM,0.3942,0.4045,0.2013,,
-4,D,United States,Paraguay,LightGBM,0.1938,0.2983,0.508,,
-5,D,Australia,Turkey,LightGBM,0.294,0.3464,0.3596,,
-6,B,Qatar,Switzerland,LightGBM,0.0966,0.1166,0.7869,,
-7,C,Brazil,Morocco,LightGBM,0.5679,0.2581,0.174,,
-8,C,Haiti,Scotland,LightGBM,0.0807,0.1885,0.7309,,
-9,E,Germany,Curaçao,LightGBM,0.9321,0.0538,0.0141,,
-10,F,Netherlands,Japan,LightGBM,0.524,0.3198,0.1561,,
-11,E,Côte d'Ivoire,Ecuador,LightGBM,0.4003,0.3128,0.2869,,
-12,F,Sweden,Tunisia,LightGBM,0.3729,0.2359,0.3912,,
-13,H,Spain,Cabo Verde,LightGBM,0.7443,0.1699,0.0858,,
-14,G,Belgium,Egypt,LightGBM,0.516,0.3648,0.1192,,
-15,H,Saudi Arabia,Uruguay,LightGBM,0.0973,0.2012,0.7015,,
-16,G,Iran,New Zealand,LightGBM,0.7599,0.1673,0.0728,,
-17,J,Austria,Jordan,LightGBM,0.759,0.1322,0.1088,,
-18,I,France,Senegal,LightGBM,0.6505,0.1558,0.1937,,
-19,I,Iraq,Norway,LightGBM,0.0953,0.2778,0.6269,,
-20,J,Argentina,Algeria,LightGBM,0.6829,0.2838,0.0333,,
-21,K,Portugal,DR Congo,LightGBM,0.6979,0.1993,0.1027,,
-22,L,England,Croatia,LightGBM,0.4933,0.3208,0.186,,
-23,L,Ghana,Panama,LightGBM,0.3917,0.3882,0.2201,,
-24,K,Uzbekistan,Colombia,LightGBM,0.0857,0.4052,0.5092,,
-25,A,Czechia,South Africa,LightGBM,0.7328,0.1744,0.0929,,
-26,B,Switzerland,Bosnia and Herzegovina,LightGBM,0.3831,0.3725,0.2444,,
-27,B,Canada,Qatar,LightGBM,0.3209,0.5524,0.1267,,
-28,A,Mexico,South Korea,LightGBM,0.2538,0.5339,0.2123,,
-29,D,Turkey,Paraguay,LightGBM,0.2754,0.4685,0.2561,,
-30,D,United States,Australia,LightGBM,0.2427,0.309,0.4483,,
-31,C,Scotland,Morocco,LightGBM,0.1774,0.3349,0.4877,,
-32,C,Brazil,Haiti,LightGBM,0.8587,0.1094,0.0319,,
-33,F,Tunisia,Japan,LightGBM,0.0799,0.4113,0.5088,,
-34,F,Netherlands,Sweden,LightGBM,0.6544,0.2923,0.0533,,
-35,E,Germany,Côte d'Ivoire,LightGBM,0.7981,0.1444,0.0575,,
-36,E,Ecuador,Curaçao,LightGBM,0.6343,0.3056,0.0601,,
-37,H,Spain,Saudi Arabia,LightGBM,0.7727,0.1975,0.0298,,
-38,G,Belgium,Iran,LightGBM,0.3963,0.4334,0.1703,,
-39,H,Uruguay,Cabo Verde,LightGBM,0.3533,0.5384,0.1083,,
-40,G,New Zealand,Egypt,LightGBM,0.1546,0.3042,0.5411,,
-41,J,Argentina,Austria,LightGBM,0.8087,0.1454,0.0459,,
-42,I,France,Iraq,LightGBM,0.8256,0.145,0.0293,,
-43,I,Norway,Senegal,LightGBM,0.1999,0.2378,0.5624,,
-44,J,Jordan,Algeria,LightGBM,0.1738,0.2958,0.5304,,
-45,K,Portugal,Uzbekistan,LightGBM,0.7052,0.1763,0.1185,,
-46,L,England,Ghana,LightGBM,0.5586,0.3418,0.0996,,
-47,L,Panama,Croatia,LightGBM,0.149,0.3657,0.4853,,
-48,K,Colombia,DR Congo,LightGBM,0.7413,0.1646,0.094,,
-49,B,Switzerland,Canada,LightGBM,0.4529,0.3027,0.2444,,
-50,B,Bosnia and Herzegovina,Qatar,LightGBM,0.5927,0.2333,0.174,,
-51,C,Scotland,Brazil,LightGBM,0.0872,0.1851,0.7277,,
-52,C,Morocco,Haiti,LightGBM,0.6385,0.2603,0.1013,,
-53,A,Czechia,Mexico,LightGBM,0.2195,0.3149,0.4656,,
-54,A,South Africa,South Korea,LightGBM,0.1844,0.2927,0.523,,
-55,E,Curaçao,Côte d'Ivoire,LightGBM,0.0292,0.1923,0.7785,,
-56,E,Ecuador,Germany,LightGBM,0.2531,0.1834,0.5635,,
-57,F,Japan,Sweden,LightGBM,0.6678,0.2209,0.1113,,
-58,F,Tunisia,Netherlands,LightGBM,0.0238,0.1321,0.8441,,
-59,D,United States,Turkey,LightGBM,0.1481,0.2526,0.5993,,
-60,D,Paraguay,Australia,LightGBM,0.2696,0.514,0.2165,,
-61,I,Norway,France,LightGBM,0.0891,0.3085,0.6024,,
-62,I,Senegal,Iraq,LightGBM,0.6911,0.1968,0.1121,,
-63,H,Cabo Verde,Saudi Arabia,LightGBM,0.321,0.3754,0.3036,,
-64,H,Uruguay,Spain,LightGBM,0.0691,0.1061,0.8247,,
-65,G,Egypt,Iran,LightGBM,0.2334,0.4623,0.3043,,
-66,G,New Zealand,Belgium,LightGBM,0.0212,0.2604,0.7183,,
-67,L,Panama,England,LightGBM,0.0616,0.259,0.6794,,
-68,L,Croatia,Ghana,LightGBM,0.3956,0.3676,0.2368,,
-69,K,Colombia,Portugal,LightGBM,0.1133,0.2294,0.6574,,
-70,K,DR Congo,Uzbekistan,LightGBM,0.258,0.3485,0.3935,,
-71,J,Algeria,Austria,LightGBM,0.2488,0.3427,0.4085,,
-72,J,Jordan,Argentina,LightGBM,0.042,0.2153,0.7426,,
+1,A,Mexico,South Africa,Ensemble,0.3382,0.5656,0.0962,1.047,0.578
+2,A,South Korea,Czechia,Ensemble,0.2523,0.3875,0.3602,1.53,1.372
+3,B,Canada,Bosnia and Herzegovina,Ensemble,0.2699,0.4778,0.2523,2.049,0.496
+4,D,United States,Paraguay,Ensemble,0.2204,0.3411,0.4386,0.977,1.668
+5,D,Australia,Turkey,Ensemble,0.2136,0.3392,0.4472,1.041,1.501
+6,B,Qatar,Switzerland,Ensemble,0.0585,0.1838,0.7577,0.741,3.704
+7,C,Brazil,Morocco,Ensemble,0.4701,0.3565,0.1734,0.572,1.307
+8,C,Haiti,Scotland,Ensemble,0.0992,0.2684,0.6323,1.53,1.893
+9,E,Germany,Curaçao,Ensemble,0.8185,0.1591,0.0224,2.629,1.14
+10,F,Netherlands,Japan,Ensemble,0.3819,0.3951,0.223,0.881,1.682
+11,E,Côte d'Ivoire,Ecuador,Ensemble,0.3337,0.373,0.2932,0.347,0.498
+12,F,Sweden,Tunisia,Ensemble,0.2894,0.2988,0.4117,1.811,1.636
+13,H,Spain,Cabo Verde,Ensemble,0.6954,0.1942,0.1104,2.424,0.731
+14,G,Belgium,Egypt,Ensemble,0.483,0.4164,0.1006,1.702,0.83
+15,H,Saudi Arabia,Uruguay,Ensemble,0.1005,0.2269,0.6726,0.485,1.124
+16,G,Iran,New Zealand,Ensemble,0.5586,0.353,0.0884,2.013,1.017
+17,J,Austria,Jordan,Ensemble,0.5997,0.2906,0.1096,2.843,0.733
+18,I,France,Senegal,Ensemble,0.4715,0.2607,0.2678,1.504,1.592
+19,I,Iraq,Norway,Ensemble,0.0828,0.2764,0.6409,0.463,3.122
+20,J,Argentina,Algeria,Ensemble,0.5908,0.3502,0.059,1.271,0.538
+21,K,Portugal,DR Congo,Ensemble,0.5844,0.3268,0.0887,1.218,0.758
+22,L,England,Croatia,Ensemble,0.3952,0.3554,0.2494,1.908,0.697
+23,L,Ghana,Panama,Ensemble,0.3666,0.3551,0.2783,0.881,2.058
+24,K,Uzbekistan,Colombia,Ensemble,0.0583,0.2971,0.6447,0.766,1.497
+25,A,Czechia,South Africa,Ensemble,0.4457,0.3756,0.1787,1.336,1.028
+26,B,Switzerland,Bosnia and Herzegovina,Ensemble,0.4408,0.3316,0.2276,2.878,1.078
+27,B,Canada,Qatar,Ensemble,0.288,0.5584,0.1536,2.612,0.345
+28,A,Mexico,South Korea,Ensemble,0.3811,0.4802,0.1387,1.131,0.819
+29,D,Turkey,Paraguay,Ensemble,0.298,0.4272,0.2749,1.497,0.953
+30,D,United States,Australia,Ensemble,0.2848,0.3021,0.4131,0.974,1.832
+31,C,Scotland,Morocco,Ensemble,0.1806,0.4114,0.408,0.417,1.928
+32,C,Brazil,Haiti,Ensemble,0.6678,0.2753,0.0569,2.104,1.282
+33,F,Tunisia,Japan,Ensemble,0.0778,0.3993,0.5228,0.403,2.55
+34,F,Netherlands,Sweden,Ensemble,0.5476,0.2946,0.1578,3.335,1.282
+35,E,Germany,Côte d'Ivoire,Ensemble,0.5724,0.3225,0.105,1.201,1.069
+36,E,Ecuador,Curaçao,Ensemble,0.4941,0.4356,0.0703,1.011,0.399
+37,H,Spain,Saudi Arabia,Ensemble,0.7805,0.1766,0.0429,3.19,0.595
+38,G,Belgium,Iran,Ensemble,0.4038,0.4428,0.1534,1.599,1.362
+39,H,Uruguay,Cabo Verde,Ensemble,0.386,0.4354,0.1786,0.778,0.654
+40,G,New Zealand,Egypt,Ensemble,0.1937,0.4698,0.3365,1.07,1.24
+41,J,Argentina,Austria,Ensemble,0.5844,0.2935,0.1221,1.572,0.583
+42,I,France,Iraq,Ensemble,0.7137,0.2287,0.0576,2.167,0.658
+43,I,Norway,Senegal,Ensemble,0.2464,0.2959,0.4577,1.695,1.431
+44,J,Jordan,Algeria,Ensemble,0.1267,0.3198,0.5536,0.631,2.464
+45,K,Portugal,Uzbekistan,Ensemble,0.6071,0.2363,0.1566,1.713,0.7
+46,L,England,Ghana,Ensemble,0.4742,0.3986,0.1271,2.492,0.385
+47,L,Panama,Croatia,Ensemble,0.1041,0.3066,0.5893,1.161,2.164
+48,K,Colombia,DR Congo,Ensemble,0.6129,0.2881,0.099,1.006,0.877
+49,B,Switzerland,Canada,Ensemble,0.5108,0.3287,0.1605,0.9,1.351
+50,B,Bosnia and Herzegovina,Qatar,Ensemble,0.4659,0.3174,0.2166,2.197,1.045
+51,C,Scotland,Brazil,Ensemble,0.0684,0.2059,0.7257,0.986,2.157
+52,C,Morocco,Haiti,Ensemble,0.5454,0.3501,0.1045,2.253,0.452
+53,A,Czechia,Mexico,Ensemble,0.167,0.3726,0.4604,0.898,1.426
+54,A,South Africa,South Korea,Ensemble,0.1982,0.4289,0.3729,0.788,1.259
+55,E,Curaçao,Côte d'Ivoire,Ensemble,0.0374,0.3415,0.6211,0.563,1.842
+56,E,Ecuador,Germany,Ensemble,0.1169,0.279,0.6041,0.748,0.667
+57,F,Japan,Sweden,Ensemble,0.5133,0.3293,0.1573,3.055,0.605
+58,F,Tunisia,Netherlands,Ensemble,0.0552,0.217,0.7278,0.855,2.778
+59,D,United States,Turkey,Ensemble,0.1533,0.2992,0.5475,1.101,3.039
+60,D,Paraguay,Australia,Ensemble,0.2646,0.4481,0.2873,0.826,0.921
+61,I,Norway,France,Ensemble,0.0872,0.2454,0.6675,1.997,1.705
+62,I,Senegal,Iraq,Ensemble,0.5271,0.3293,0.1436,2.212,0.459
+63,H,Cabo Verde,Saudi Arabia,Ensemble,0.3292,0.3893,0.2814,1.226,0.789
+64,H,Uruguay,Spain,Ensemble,0.0479,0.1919,0.7602,0.435,2.295
+65,G,Egypt,Iran,Ensemble,0.1738,0.5117,0.3145,0.619,1.106
+66,G,New Zealand,Belgium,Ensemble,0.0236,0.2189,0.7575,1.258,3.353
+67,L,Panama,England,Ensemble,0.0455,0.1886,0.7659,0.491,2.673
+68,L,Croatia,Ghana,Ensemble,0.3983,0.4413,0.1604,2.27,0.808
+69,K,Colombia,Portugal,Ensemble,0.1716,0.3027,0.5258,1.325,1.891
+70,K,DR Congo,Uzbekistan,Ensemble,0.2248,0.3118,0.4635,0.77,0.549
+71,J,Algeria,Austria,Ensemble,0.1637,0.3991,0.4373,1.069,1.092
+72,J,Jordan,Argentina,Ensemble,0.0254,0.2091,0.7655,0.35,3.492
+1,A,Mexico,South Africa,Random Forest,0.4961,0.3627,0.1412,,
+2,A,South Korea,Czechia,Random Forest,0.256,0.4421,0.3019,,
+3,B,Canada,Bosnia and Herzegovina,Random Forest,0.3554,0.4057,0.2388,,
+4,D,United States,Paraguay,Random Forest,0.3192,0.3264,0.3544,,
+5,D,Australia,Turkey,Random Forest,0.263,0.4166,0.3204,,
+6,B,Qatar,Switzerland,Random Forest,0.1686,0.2715,0.56,,
+7,C,Brazil,Morocco,Random Forest,0.5232,0.2978,0.179,,
+8,C,Haiti,Scotland,Random Forest,0.1938,0.3846,0.4216,,
+9,E,Germany,Curaçao,Random Forest,0.68,0.2194,0.1005,,
+10,F,Netherlands,Japan,Random Forest,0.489,0.309,0.202,,
+11,E,Côte d'Ivoire,Ecuador,Random Forest,0.3408,0.4038,0.2554,,
+12,F,Sweden,Tunisia,Random Forest,0.3614,0.306,0.3326,,
+13,H,Spain,Cabo Verde,Random Forest,0.6219,0.2662,0.1118,,
+14,G,Belgium,Egypt,Random Forest,0.4663,0.403,0.1308,,
+15,H,Saudi Arabia,Uruguay,Random Forest,0.2193,0.3454,0.4352,,
+16,G,Iran,New Zealand,Random Forest,0.5646,0.2925,0.1429,,
+17,J,Austria,Jordan,Random Forest,0.5196,0.302,0.1784,,
+18,I,France,Senegal,Random Forest,0.445,0.3065,0.2486,,
+19,I,Iraq,Norway,Random Forest,0.1403,0.384,0.4758,,
+20,J,Argentina,Algeria,Random Forest,0.5509,0.3542,0.0949,,
+21,K,Portugal,DR Congo,Random Forest,0.5524,0.3123,0.1353,,
+22,L,England,Croatia,Random Forest,0.421,0.361,0.218,,
+23,L,Ghana,Panama,Random Forest,0.3846,0.339,0.2765,,
+24,K,Uzbekistan,Colombia,Random Forest,0.1669,0.3416,0.4915,,
+25,A,Czechia,South Africa,Random Forest,0.4927,0.3247,0.1826,,
+26,B,Switzerland,Bosnia and Herzegovina,Random Forest,0.5078,0.3097,0.1825,,
+27,B,Canada,Qatar,Random Forest,0.491,0.3433,0.1657,,
+28,A,Mexico,South Korea,Random Forest,0.4034,0.423,0.1735,,
+29,D,Turkey,Paraguay,Random Forest,0.338,0.3947,0.2673,,
+30,D,United States,Australia,Random Forest,0.3569,0.299,0.3441,,
+31,C,Scotland,Morocco,Random Forest,0.2494,0.3944,0.3562,,
+32,C,Brazil,Haiti,Random Forest,0.63,0.2569,0.1131,,
+33,F,Tunisia,Japan,Random Forest,0.1957,0.3694,0.435,,
+34,F,Netherlands,Sweden,Random Forest,0.5293,0.3596,0.1111,,
+35,E,Germany,Côte d'Ivoire,Random Forest,0.5803,0.3036,0.1162,,
+36,E,Ecuador,Curaçao,Random Forest,0.6008,0.2754,0.1238,,
+37,H,Spain,Saudi Arabia,Random Forest,0.6493,0.2423,0.1084,,
+38,G,Belgium,Iran,Random Forest,0.5131,0.367,0.1199,,
+39,H,Uruguay,Cabo Verde,Random Forest,0.4365,0.3353,0.2282,,
+40,G,New Zealand,Egypt,Random Forest,0.1784,0.445,0.3766,,
+41,J,Argentina,Austria,Random Forest,0.546,0.3032,0.1508,,
+42,I,France,Iraq,Random Forest,0.6615,0.2488,0.0897,,
+43,I,Norway,Senegal,Random Forest,0.2418,0.3533,0.4049,,
+44,J,Jordan,Algeria,Random Forest,0.1897,0.3967,0.4136,,
+45,K,Portugal,Uzbekistan,Random Forest,0.6175,0.2519,0.1307,,
+46,L,England,Ghana,Random Forest,0.5659,0.2876,0.1465,,
+47,L,Panama,Croatia,Random Forest,0.1663,0.3834,0.4504,,
+48,K,Colombia,DR Congo,Random Forest,0.5522,0.2903,0.1574,,
+49,B,Switzerland,Canada,Random Forest,0.438,0.3477,0.2143,,
+50,B,Bosnia and Herzegovina,Qatar,Random Forest,0.4616,0.3285,0.2099,,
+51,C,Scotland,Brazil,Random Forest,0.1279,0.3201,0.552,,
+52,C,Morocco,Haiti,Random Forest,0.5403,0.3083,0.1514,,
+53,A,Czechia,Mexico,Random Forest,0.2798,0.3424,0.3778,,
+54,A,South Africa,South Korea,Random Forest,0.2318,0.404,0.3642,,
+55,E,Curaçao,Côte d'Ivoire,Random Forest,0.1026,0.4104,0.487,,
+56,E,Ecuador,Germany,Random Forest,0.1634,0.2746,0.562,,
+57,F,Japan,Sweden,Random Forest,0.4164,0.4049,0.1787,,
+58,F,Tunisia,Netherlands,Random Forest,0.0987,0.2383,0.663,,
+59,D,United States,Turkey,Random Forest,0.2162,0.3372,0.4466,,
+60,D,Paraguay,Australia,Random Forest,0.3449,0.3576,0.2975,,
+61,I,Norway,France,Random Forest,0.1459,0.3641,0.4899,,
+62,I,Senegal,Iraq,Random Forest,0.5413,0.3052,0.1535,,
+63,H,Cabo Verde,Saudi Arabia,Random Forest,0.3658,0.3695,0.2647,,
+64,H,Uruguay,Spain,Random Forest,0.1036,0.2041,0.6924,,
+65,G,Egypt,Iran,Random Forest,0.2665,0.4238,0.3097,,
+66,G,New Zealand,Belgium,Random Forest,0.0684,0.2485,0.6831,,
+67,L,Panama,England,Random Forest,0.0945,0.299,0.6065,,
+68,L,Croatia,Ghana,Random Forest,0.486,0.2891,0.2249,,
+69,K,Colombia,Portugal,Random Forest,0.2133,0.334,0.4527,,
+70,K,DR Congo,Uzbekistan,Random Forest,0.2758,0.3391,0.3851,,
+71,J,Algeria,Austria,Random Forest,0.2475,0.3595,0.393,,
+72,J,Jordan,Argentina,Random Forest,0.0897,0.3243,0.586,,
+1,A,Mexico,South Africa,LightGBM,0.1999,0.7026,0.0975,,
+2,A,South Korea,Czechia,LightGBM,0.3435,0.3781,0.2784,,
+3,B,Canada,Bosnia and Herzegovina,LightGBM,0.3448,0.4421,0.2131,,
+4,D,United States,Paraguay,LightGBM,0.1783,0.2721,0.5495,,
+5,D,Australia,Turkey,LightGBM,0.3092,0.3657,0.325,,
+6,B,Qatar,Switzerland,LightGBM,0.0772,0.1116,0.8112,,
+7,C,Brazil,Morocco,LightGBM,0.6591,0.2126,0.1283,,
+8,C,Haiti,Scotland,LightGBM,0.0673,0.1642,0.7685,,
+9,E,Germany,Curaçao,LightGBM,0.9428,0.0443,0.0129,,
+10,F,Netherlands,Japan,LightGBM,0.4661,0.3501,0.1837,,
+11,E,Côte d'Ivoire,Ecuador,LightGBM,0.4009,0.263,0.3361,,
+12,F,Sweden,Tunisia,LightGBM,0.3008,0.2649,0.4343,,
+13,H,Spain,Cabo Verde,LightGBM,0.8517,0.0907,0.0576,,
+14,G,Belgium,Egypt,LightGBM,0.5737,0.3756,0.0507,,
+15,H,Saudi Arabia,Uruguay,LightGBM,0.1299,0.1862,0.6839,,
+16,G,Iran,New Zealand,LightGBM,0.6636,0.2341,0.1023,,
+17,J,Austria,Jordan,LightGBM,0.6857,0.1974,0.1169,,
+18,I,France,Senegal,LightGBM,0.6072,0.1744,0.2183,,
+19,I,Iraq,Norway,LightGBM,0.0946,0.2752,0.6302,,
+20,J,Argentina,Algeria,LightGBM,0.7646,0.2043,0.0311,,
+21,K,Portugal,DR Congo,LightGBM,0.6317,0.2832,0.0851,,
+22,L,England,Croatia,LightGBM,0.4065,0.3401,0.2534,,
+23,L,Ghana,Panama,LightGBM,0.547,0.3123,0.1407,,
+24,K,Uzbekistan,Colombia,LightGBM,0.0894,0.325,0.5856,,
+25,A,Czechia,South Africa,LightGBM,0.6008,0.2681,0.1312,,
+26,B,Switzerland,Bosnia and Herzegovina,LightGBM,0.4445,0.3967,0.1589,,
+27,B,Canada,Qatar,LightGBM,0.2779,0.5564,0.1657,,
+28,A,Mexico,South Korea,LightGBM,0.3786,0.4819,0.1395,,
+29,D,Turkey,Paraguay,LightGBM,0.2602,0.3954,0.3444,,
+30,D,United States,Australia,LightGBM,0.318,0.2574,0.4245,,
+31,C,Scotland,Morocco,LightGBM,0.2621,0.3553,0.3826,,
+32,C,Brazil,Haiti,LightGBM,0.6577,0.2553,0.087,,
+33,F,Tunisia,Japan,LightGBM,0.077,0.4168,0.5062,,
+34,F,Netherlands,Sweden,LightGBM,0.6495,0.281,0.0696,,
+35,E,Germany,Côte d'Ivoire,LightGBM,0.7353,0.2089,0.0558,,
+36,E,Ecuador,Curaçao,LightGBM,0.5652,0.354,0.0808,,
+37,H,Spain,Saudi Arabia,LightGBM,0.9058,0.0721,0.0221,,
+38,G,Belgium,Iran,LightGBM,0.4054,0.4976,0.097,,
+39,H,Uruguay,Cabo Verde,LightGBM,0.328,0.5743,0.0977,,
+40,G,New Zealand,Egypt,LightGBM,0.2596,0.3838,0.3567,,
+41,J,Argentina,Austria,LightGBM,0.7918,0.1377,0.0705,,
+42,I,France,Iraq,LightGBM,0.7161,0.2386,0.0453,,
+43,I,Norway,Senegal,LightGBM,0.2645,0.2053,0.5302,,
+44,J,Jordan,Algeria,LightGBM,0.1701,0.262,0.5679,,
+45,K,Portugal,Uzbekistan,LightGBM,0.5818,0.23,0.1882,,
+46,L,England,Ghana,LightGBM,0.3971,0.4203,0.1826,,
+47,L,Panama,Croatia,LightGBM,0.1477,0.3275,0.5248,,
+48,K,Colombia,DR Congo,LightGBM,0.7566,0.1636,0.0798,,
+49,B,Switzerland,Canada,LightGBM,0.5741,0.2776,0.1483,,
+50,B,Bosnia and Herzegovina,Qatar,LightGBM,0.5054,0.2828,0.2119,,
+51,C,Scotland,Brazil,LightGBM,0.1173,0.1582,0.7245,,
+52,C,Morocco,Haiti,LightGBM,0.542,0.296,0.162,,
+53,A,Czechia,Mexico,LightGBM,0.2144,0.2402,0.5454,,
+54,A,South Africa,South Korea,LightGBM,0.2885,0.3317,0.3798,,
+55,E,Curaçao,Côte d'Ivoire,LightGBM,0.0353,0.3237,0.641,,
+56,E,Ecuador,Germany,LightGBM,0.1661,0.1771,0.6568,,
+57,F,Japan,Sweden,LightGBM,0.6043,0.2715,0.1242,,
+58,F,Tunisia,Netherlands,LightGBM,0.0297,0.1696,0.8007,,
+59,D,United States,Turkey,LightGBM,0.1992,0.2709,0.53,,
+60,D,Paraguay,Australia,LightGBM,0.2866,0.5278,0.1856,,
+61,I,Norway,France,LightGBM,0.1459,0.3693,0.4848,,
+62,I,Senegal,Iraq,LightGBM,0.5961,0.2802,0.1237,,
+63,H,Cabo Verde,Saudi Arabia,LightGBM,0.3801,0.3843,0.2355,,
+64,H,Uruguay,Spain,LightGBM,0.0586,0.157,0.7844,,
+65,G,Egypt,Iran,LightGBM,0.1986,0.5292,0.2722,,
+66,G,New Zealand,Belgium,LightGBM,0.0084,0.125,0.8666,,
+67,L,Panama,England,LightGBM,0.0798,0.1574,0.7628,,
+68,L,Croatia,Ghana,LightGBM,0.3543,0.4721,0.1737,,
+69,K,Colombia,Portugal,LightGBM,0.1273,0.2891,0.5837,,
+70,K,DR Congo,Uzbekistan,LightGBM,0.295,0.3001,0.4049,,
+71,J,Algeria,Austria,LightGBM,0.1919,0.3698,0.4383,,
+72,J,Jordan,Argentina,LightGBM,0.0528,0.2217,0.7256,,

@@ -76,7 +76,7 @@ FEATURE_COLS = [
     "defense_away",
     "neutral",
     "tournament_weight",
-    # ── Yeni feature'lar ──
+    # ── Form + gol istatistikleri ──
     "points_last_5_home",
     "points_last_5_away",
     "goal_diff_last_5_home",
@@ -95,7 +95,7 @@ FEATURE_COLS = [
     "failed_to_score_rate_away",
     "h2h_goal_diff",
     "common_opponent_diff",
-    # ── Yeni feature'lar (36 toplam) ──
+    # ── Kadro & deneyim ──
     "experience_score_home",
     "experience_score_away",
     "avg_age_home",
@@ -104,14 +104,33 @@ FEATURE_COLS = [
     "market_value_proxy_away",
     "top5_league_count_home",
     "top5_league_count_away",
-    # ── Yeni feature'lar (43 toplam) ──
+    # ── Trend & tutarsızlık ──
     "goal_trend_home", "goal_trend_away",
     "form_consistency_home", "form_consistency_away",
     "attack_ratio_home", "attack_ratio_away",
     "elo_form_interaction",
+    # ── Yeni: kadro kalite göstergeleri ──
+    "goals_per90_home", "goals_per90_away",
+    "assists_per90_home", "assists_per90_away",
+    # ── Yeni: antrenör ──
+    "coach_win_rate_home", "coach_win_rate_away",
+    "coach_wc_apps_home",  "coach_wc_apps_away",
+    # ── Yeni: venue & seyahat ──
+    "altitude_m",
+    "travel_km_diff",
+    "temp_celsius",
 ]
-POISSON_HOME_FEATS = ["elo_diff", "attack_home", "defense_away", "neutral", "tournament_weight"]
-POISSON_AWAY_FEATS = ["elo_diff", "attack_away", "defense_home", "neutral", "tournament_weight"]
+# Genişletilmiş Poisson feature'ları — home ve away için ayrı
+POISSON_HOME_FEATS = [
+    "elo_diff", "attack_home", "defense_away",
+    "weighted_form_home", "goals_for_last_5_home",
+    "altitude_m", "neutral", "tournament_weight",
+]
+POISSON_AWAY_FEATS = [
+    "elo_diff", "attack_away", "defense_home",
+    "weighted_form_away", "goals_for_last_5_away",
+    "altitude_m", "neutral", "tournament_weight",
+]
 LABEL_MAP = {"H": 0, "D": 1, "A": 2}
 MAX_GOALS = 8
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import sys
+import math
 import warnings
 import numpy as np
 import pandas as pd
@@ -25,21 +26,26 @@ sys.path.insert(0, os.path.join(APP_DIR, "src"))
 
 from config import FILES, TEAM_NAME_MAP, ROLLING_FORM_WINDOW, BASE_GOAL_RATE
 
+RAW_DIR       = os.path.join(APP_DIR, "data", "raw")
 PROCESSED_DIR = os.path.join(APP_DIR, "data", "processed")
 os.makedirs(PROCESSED_DIR, exist_ok=True)
 
-# ── Squad stats yükleme (enrich_team_data.py çalıştırılmışsa kullanılır) ──────
+# ── Squad stats yükleme ───────────────────────────────────────────────────────
 _squad_path = os.path.join(PROCESSED_DIR, "squad_stats.csv")
 if os.path.isfile(_squad_path):
     _squad_df = pd.read_csv(_squad_path).set_index("team")
     _squad_map: dict = _squad_df.to_dict("index")
-    _global_avg_age = float(_squad_df["avg_age"].mean())
-    _global_mv      = float(_squad_df["market_value_proxy"].mean())
-    _global_t5      = float(_squad_df["top5_league_count"].mean())
+    _global_avg_age  = float(_squad_df["avg_age"].mean())
+    _global_mv       = float(_squad_df["market_value_proxy"].mean())
+    _global_t5       = float(_squad_df["top5_league_count"].mean())
+    _global_gp90     = float(_squad_df["goals_per90"].mean())     if "goals_per90"   in _squad_df.columns else 0.09
+    _global_ap90     = float(_squad_df["assists_per90"].mean())   if "assists_per90" in _squad_df.columns else 0.07
+    _global_fgp90    = float(_squad_df["forward_goals_p90"].mean()) if "forward_goals_p90" in _squad_df.columns else 0.20
     print(f"[OK]  squad_stats.csv yüklendi: {len(_squad_df)} takım")
 else:
     _squad_map = {}
     _global_avg_age, _global_mv, _global_t5 = 26.0, 30.0, 10.0
+    _global_gp90, _global_ap90, _global_fgp90 = 0.09, 0.07, 0.20
     print("[INFO] squad_stats.csv bulunamadı — global ortalamalar kullanılacak")
 
 def get_squad_feat(team: str, feat: str) -> float:
@@ -52,8 +58,176 @@ def get_squad_feat(team: str, feat: str) -> float:
         "avg_age":            _global_avg_age,
         "market_value_proxy": _global_mv,
         "top5_league_count":  _global_t5,
+        "goals_per90":        _global_gp90,
+        "assists_per90":      _global_ap90,
+        "forward_goals_p90":  _global_fgp90,
     }
     return defaults.get(feat, 0.0)
+
+
+# ── Venue lookup (WC 2026 stadyumları) ───────────────────────────────────────
+_venues_path = os.path.join(RAW_DIR, "wc2026_venues.csv")
+_venue_map: dict = {}  # venue_key → {altitude_m, avg_june_temp_c, lat, lon}
+if os.path.isfile(_venues_path):
+    _vdf = pd.read_csv(_venues_path)
+    for _, vrow in _vdf.iterrows():
+        _venue_map[str(vrow["venue_key"]).strip()] = {
+            "altitude_m":       float(vrow["altitude_m"]),
+            "temp_celsius":     float(vrow["avg_june_temp_c"]),
+            "lat":              float(vrow["lat"]),
+            "lon":              float(vrow["lon"]),
+        }
+    print(f"[OK]  wc2026_venues.csv yüklendi: {len(_venue_map)} statdyum")
+else:
+    print("[INFO] wc2026_venues.csv bulunamadı — venue features atlanacak")
+
+def _match_venue(venue_str: str) -> dict | None:
+    """Venue string'inden altitude ve sıcaklık döner."""
+    if not venue_str or pd.isna(venue_str):
+        return None
+    v = str(venue_str).strip()
+    for key, data in _venue_map.items():
+        if key.lower() in v.lower() or v.lower().startswith(key.lower()):
+            return data
+    # Fuzzy: first significant word match
+    first_word = v.split(",")[0].split(" ")[0].lower()
+    for key, data in _venue_map.items():
+        if first_word in key.lower():
+            return data
+    return None
+
+def get_venue_features(venue_str: str) -> dict:
+    """Statdyum özelliklerini döner. Bulunamazsa global ortalama."""
+    info = _match_venue(venue_str)
+    if info:
+        return {"altitude_m": info["altitude_m"], "temp_celsius": info["temp_celsius"],
+                "venue_lat": info["lat"], "venue_lon": info["lon"]}
+    return {"altitude_m": 200.0, "temp_celsius": 22.0, "venue_lat": 40.0, "venue_lon": -95.0}
+
+
+# ── Takım ana lokasyonu (seyahat mesafesi için) ───────────────────────────────
+TEAM_HOME_COORDS: dict[str, tuple[float, float]] = {
+    # Kuzey Amerika
+    "Mexico":            (19.43, -99.13),
+    "United States":     (39.50, -98.35),
+    "Canada":            (45.42, -75.70),
+    # Güney Amerika
+    "Brazil":            (-15.78, -47.93),
+    "Argentina":         (-34.60, -58.38),
+    "Uruguay":           (-34.90, -56.16),
+    "Colombia":          (4.71,  -74.07),
+    "Ecuador":           (-0.18, -78.47),
+    "Peru":              (-12.05, -77.04),
+    "Paraguay":          (-25.26, -57.58),
+    "Venezuela":         (10.48, -66.90),
+    "Bolivia":           (-16.50, -68.15),
+    "Chile":             (-33.46, -70.65),
+    "Haiti":             (18.59, -72.31),
+    "Honduras":          (14.07, -87.21),
+    "Costa Rica":        (9.93,  -84.09),
+    "Panama":            (8.99,  -79.52),
+    "Jamaica":           (17.97, -76.79),
+    # Avrupa
+    "France":            (48.86,   2.35),
+    "Germany":           (52.52,  13.41),
+    "Spain":             (40.42,  -3.70),
+    "England":           (51.51,  -0.13),
+    "Portugal":          (38.72,  -9.14),
+    "Netherlands":       (52.37,   4.90),
+    "Belgium":           (50.85,   4.35),
+    "Italy":             (41.90,  12.50),
+    "Croatia":           (45.82,  15.98),
+    "Switzerland":       (46.95,   7.45),
+    "Serbia":            (44.82,  20.46),
+    "Poland":            (52.23,  21.01),
+    "Austria":           (48.21,  16.37),
+    "Hungary":           (47.50,  19.04),
+    "Turkey":            (39.93,  32.86),
+    "Ukraine":           (50.45,  30.52),
+    "Scotland":          (55.86,  -4.25),
+    "Denmark":           (55.68,  12.57),
+    "Sweden":            (59.33,  18.07),
+    "Norway":            (59.91,  10.75),
+    "Greece":            (37.98,  23.73),
+    "Romania":           (44.43,  26.10),
+    "Czech Republic":    (50.08,  14.44),
+    "Czechia":           (50.08,  14.44),
+    "Slovakia":          (48.15,  17.11),
+    "Bosnia and Herzegovina": (43.85, 18.36),
+    "North Macedonia":   (41.99,  21.43),
+    "Albania":           (41.33,  19.82),
+    "Slovenia":          (46.05,  14.51),
+    "Iceland":           (64.14, -21.94),
+    "Wales":             (51.48,  -3.18),
+    "Northern Ireland":  (54.60,  -5.93),
+    "Republic of Ireland": (53.33, -6.25),
+    "Ireland":           (53.33,  -6.25),
+    "Curaçao":           (12.12, -68.88),
+    # Afrika
+    "Morocco":           (33.99,  -6.85),
+    "Senegal":           (14.72, -17.47),
+    "Nigeria":           (9.08,   8.68),
+    "Cameroon":          (3.85,  11.50),
+    "Ghana":             (5.56,  -0.20),
+    "Côte d'Ivoire":     (5.36,  -4.01),
+    "South Africa":      (-25.75, 28.19),
+    "Egypt":             (30.04,  31.24),
+    "Tunisia":           (36.82,  10.17),
+    "Algeria":           (36.74,   3.09),
+    "Mali":              (12.65,  -8.00),
+    # Asya
+    "Japan":             (35.68, 139.69),
+    "South Korea":       (37.57, 126.98),
+    "Iran":              (35.69,  51.39),
+    "Saudi Arabia":      (24.69,  46.72),
+    "Qatar":             (25.29,  51.53),
+    "Australia":         (-35.31, 149.12),
+    "New Zealand":       (-41.29, 174.78),
+    "Indonesia":         (-6.21, 106.85),
+    "Philippines":       (14.60, 120.98),
+    "Thailand":          (13.76, 100.50),
+    "Uzbekistan":        (41.30,  69.24),
+    "Iraq":              (33.34,  44.40),
+}
+
+def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """İki koordinat arasında km cinsinden büyük daire mesafesi."""
+    R = 6371.0
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi   = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2)**2
+    return round(2 * R * math.asin(math.sqrt(a)))
+
+def get_travel_km(team: str, venue_lat: float, venue_lon: float) -> float:
+    """Takımın ülkesinden statdyuma km mesafesi."""
+    coords = TEAM_HOME_COORDS.get(team)
+    if coords is None:
+        return 5000.0  # varsayılan: uzak takım
+    return haversine_km(coords[0], coords[1], venue_lat, venue_lon)
+
+
+# ── Antrenör (teknik direktör) lookup ─────────────────────────────────────────
+_coaches_path = os.path.join(RAW_DIR, "wc2026_coaches.csv")
+_coach_map: dict = {}
+if os.path.isfile(_coaches_path):
+    _cdf = pd.read_csv(_coaches_path)
+    for _, crow in _cdf.iterrows():
+        _coach_map[str(crow["team"]).strip()] = {
+            "win_rate":    float(crow["win_rate"]),
+            "wc_apps":     int(crow["wc_apps_as_coach"]),
+            "intl_titles": int(crow["intl_titles"]),
+        }
+    print(f"[OK]  wc2026_coaches.csv yüklendi: {len(_coach_map)} antrenör")
+else:
+    print("[INFO] wc2026_coaches.csv bulunamadı — antrenör features atlanacak")
+
+def get_coach_feat(team: str, feat: str) -> float:
+    """Antrenör istatistiği döner. Bulunamazsa ortalama."""
+    defaults = {"win_rate": 0.48, "wc_apps": 0.0, "intl_titles": 0.0}
+    if team in _coach_map:
+        return float(_coach_map[team].get(feat, defaults.get(feat, 0.0)))
+    return float(defaults.get(feat, 0.0))
 
 
 # ── Veri yükleme ─────────────────────────────────────────────────────────────
@@ -517,6 +691,57 @@ def compute_upset_risk_v2(
     return round(min(max(upset_risk, 0.0), 1.0), 4)
 
 
+def compute_upset_risk_v3(
+    elo_diff: float,
+    underdog_form: float,
+    favorite_form: float,
+    neutral: int,
+    underdog_mv: float = 0.0,
+    favorite_mv: float = 0.0,
+    underdog_exp: int = 0,
+    favorite_exp: int = 0,
+    underdog_coach_wr: float = 0.48,
+    favorite_coach_wr: float = 0.48,
+    favorite_coach_wc: int = 0,
+    altitude_m: float = 200.0,
+    travel_km_fav: float = 0.0,
+    travel_km_dog: float = 0.0,
+    temp_celsius: float = 22.0,
+) -> float:
+    """
+    v3: v2 + antrenör farkı + irtifa yorgunluğu + seyahat mesafesi + sıcaklık.
+
+    - Favori uzak seyahat ediyorsa → daha fazla sürpriz riski
+    - Yüksek irtifa (>1500m) → küçük takım avantajı (konvansiyonel güç daha yorulur)
+    - Sıcak/nemli hava (>28°C) → büyük takımların hazır beklenen kondisyon avantajı azalır
+    - Deneyimli underdog antrenörü vs deneyimsiz favori antrenörü → daha fazla sürpriz
+    """
+    base = compute_upset_risk_v2(
+        elo_diff, underdog_form, favorite_form, neutral,
+        underdog_mv, favorite_mv, underdog_exp, favorite_exp,
+    )
+
+    # Antrenör deneyim bonusu
+    coach_edge = (underdog_coach_wr - favorite_coach_wr) * 0.5
+    wc_exp_fav = min(favorite_coach_wc / 3.0, 1.0)  # 3+ WC = tam puan
+    coach_component = max(0.0, coach_edge) - wc_exp_fav * 0.05  # deneyimli favori biraz avantaj
+
+    # İrtifa bileşeni (>1500m = önemli etki)
+    alt_factor = min(1.0, max(0.0, (altitude_m - 500) / 2000.0))
+    altitude_component = alt_factor * 0.1  # irtifa büyük takımları biraz daha zorlar
+
+    # Seyahat yorgunluğu (favorinin yolu daha uzunsa)
+    travel_diff = travel_km_fav - travel_km_dog
+    travel_component = min(0.08, max(-0.03, travel_diff / 30000.0))
+
+    # Sıcak hava yorgunluğu (>28°C önemli)
+    heat_factor = max(0.0, (temp_celsius - 20) / 20.0) * 0.04
+
+    adjustment = coach_component + altitude_component + travel_component + heat_factor
+    result = base + adjustment
+    return round(min(max(result, 0.0), 1.0), 4)
+
+
 # ── Tarihi maç feature matrisi ────────────────────────────────────────────────
 print("\nTarihi feature matrisi oluşturuluyor...")
 
@@ -620,6 +845,18 @@ for i, (_, row) in enumerate(results_modern.iterrows()):
         "attack_ratio_home":         round(ad_home["attack_strength"] / (ad_away["defense_weakness"] + 0.1), 4),
         "attack_ratio_away":         round(ad_away["attack_strength"] / (ad_home["defense_weakness"] + 0.1), 4),
         "elo_form_interaction":      round((elo_diff / 400.0) * (form_diff or 0.0), 4) if not np.isnan(elo_diff or 0.0) else 0.0,
+        # ── Yeni feature'lar (55 toplam) — tarihi için varsayılan/NaN ──
+        "goals_per90_home":          get_squad_feat(home, "goals_per90"),
+        "goals_per90_away":          get_squad_feat(away, "goals_per90"),
+        "assists_per90_home":        get_squad_feat(home, "assists_per90"),
+        "assists_per90_away":        get_squad_feat(away, "assists_per90"),
+        "coach_win_rate_home":       get_coach_feat(home, "win_rate"),
+        "coach_win_rate_away":       get_coach_feat(away, "win_rate"),
+        "coach_wc_apps_home":        get_coach_feat(home, "wc_apps"),
+        "coach_wc_apps_away":        get_coach_feat(away, "wc_apps"),
+        "altitude_m":                200.0,    # tarihi maçlarda statdyum verisi yok
+        "travel_km_diff":            0.0,      # tarihi maçlarda seyahat verisi yok
+        "temp_celsius":              15.0,     # tarihi maçlarda hava verisi yok
         # ── Hedef ──
         "home_score":                hs,
         "away_score":                as_,
@@ -638,6 +875,7 @@ for _, row in group_fixtures.iterrows():
     home = row["home_team"]
     away = row["away_team"]
     date = row["date_utc"]
+    vfeat = get_venue_features(str(row.get("venue", "")))
 
     elo_home = fast_elo(home, date)
     elo_away = fast_elo(away, date)
@@ -713,7 +951,7 @@ for _, row in group_fixtures.iterrows():
         "market_value_proxy_away":   get_squad_feat(away, "market_value_proxy"),
         "top5_league_count_home":    get_squad_feat(home, "top5_league_count"),
         "top5_league_count_away":    get_squad_feat(away, "top5_league_count"),
-        # ── Yeni feature'lar (43 toplam) ──
+        # ── Yeni feature'lar (55 toplam) ──
         "goal_trend_home":           get_goal_trend(home, date),
         "goal_trend_away":           get_goal_trend(away, date),
         "form_consistency_home":     get_form_consistency(home, date),
@@ -721,34 +959,50 @@ for _, row in group_fixtures.iterrows():
         "attack_ratio_home":         round(ad_home["attack_strength"] / (ad_away["defense_weakness"] + 0.1), 4),
         "attack_ratio_away":         round(ad_away["attack_strength"] / (ad_home["defense_weakness"] + 0.1), 4),
         "elo_form_interaction":      round((elo_diff / 400.0) * (form_diff or 0.0), 4) if not np.isnan(elo_diff or 0.0) else 0.0,
+        # ── Yeni (squad + coach + venue + seyahat) ──
+        "goals_per90_home":          get_squad_feat(home, "goals_per90"),
+        "goals_per90_away":          get_squad_feat(away, "goals_per90"),
+        "assists_per90_home":        get_squad_feat(home, "assists_per90"),
+        "assists_per90_away":        get_squad_feat(away, "assists_per90"),
+        "coach_win_rate_home":       get_coach_feat(home, "win_rate"),
+        "coach_win_rate_away":       get_coach_feat(away, "win_rate"),
+        "coach_wc_apps_home":        get_coach_feat(home, "wc_apps"),
+        "coach_wc_apps_away":        get_coach_feat(away, "wc_apps"),
+        "altitude_m":                vfeat["altitude_m"],
+        "travel_km_diff":            round(get_travel_km(away, vfeat["venue_lat"], vfeat["venue_lon"])
+                                     - get_travel_km(home, vfeat["venue_lat"], vfeat["venue_lon"])),
+        "temp_celsius":              vfeat["temp_celsius"],
     })
 
 future_df = pd.DataFrame(future_rows)
 
-# Upset risk ekle (2026 fikstürleri için genişletilmiş v2 formülü)
-future_df["upset_risk"] = future_df.apply(
-    lambda r: compute_upset_risk_v2(
+# Upset risk v3 ekle (en kapsamlı formül)
+def _upset_v3_row(r):
+    is_home_fav = (r.get("elo_diff", 0) or 0) > 0
+    fav_team  = r["home_team"] if is_home_fav else r["away_team"]
+    dog_team  = r["away_team"] if is_home_fav else r["home_team"]
+    fav_form  = r["weighted_form_home"] if is_home_fav else r["weighted_form_away"]
+    dog_form  = r["weighted_form_away"] if is_home_fav else r["weighted_form_home"]
+    vl = get_venue_features(r.get("venue", ""))
+    return compute_upset_risk_v3(
         r["elo_diff"],
-        r["weighted_form_away"], r["weighted_form_home"], r["neutral"],
-        underdog_mv=float(min(
-            r.get("market_value_proxy_home", 0) or 0,
-            r.get("market_value_proxy_away",  0) or 0,
-        )),
-        favorite_mv=float(max(
-            r.get("market_value_proxy_home", 0) or 0,
-            r.get("market_value_proxy_away",  0) or 0,
-        )),
-        underdog_exp=int(min(
-            r.get("experience_score_home", 0) or 0,
-            r.get("experience_score_away",  0) or 0,
-        )),
-        favorite_exp=int(max(
-            r.get("experience_score_home", 0) or 0,
-            r.get("experience_score_away",  0) or 0,
-        )),
-    ),
-    axis=1,
-)
+        dog_form, fav_form, int(r["neutral"]),
+        underdog_mv=float(min(r.get("market_value_proxy_home", 0) or 0, r.get("market_value_proxy_away", 0) or 0)),
+        favorite_mv=float(max(r.get("market_value_proxy_home", 0) or 0, r.get("market_value_proxy_away", 0) or 0)),
+        underdog_exp=int(min(r.get("experience_score_home", 0) or 0, r.get("experience_score_away", 0) or 0)),
+        favorite_exp=int(max(r.get("experience_score_home", 0) or 0, r.get("experience_score_away", 0) or 0)),
+        underdog_coach_wr=get_coach_feat(dog_team, "win_rate"),
+        favorite_coach_wr=get_coach_feat(fav_team, "win_rate"),
+        favorite_coach_wc=int(get_coach_feat(fav_team, "wc_apps")),
+        altitude_m=float(r.get("altitude_m", 200) or 200),
+        travel_km_fav=get_travel_km(fav_team, vl["venue_lat"], vl["venue_lon"]),
+        travel_km_dog=get_travel_km(dog_team, vl["venue_lat"], vl["venue_lon"]),
+        temp_celsius=float(r.get("temp_celsius", 22) or 22),
+    )
+
+# Venue features'ı future_rows loop'unda hesaplaması için vfeat eklendi;
+# burada future_df üzerinden özet işlem yapıyoruz
+future_df["upset_risk"] = future_df.apply(_upset_v3_row, axis=1)
 future_df["upset_label"] = future_df["upset_risk"].apply(upset_label)
 
 print(f"  2026 feature matrisi hazır: {future_df.shape}")
@@ -785,7 +1039,19 @@ new_cols = [
     "experience_score_home", "avg_age_home", "market_value_proxy_home",
     "top5_league_count_home",
     "goal_trend_home", "form_consistency_home", "attack_ratio_home", "elo_form_interaction",
+    "goals_per90_home", "assists_per90_home",
+    "coach_win_rate_home", "coach_wc_apps_home",
+    "altitude_m", "travel_km_diff", "temp_celsius",
 ]
 for c in new_cols:
-    pct_nan = features_df[c].isna().mean() * 100
-    print(f"  {c:<35}: {pct_nan:.1f}% NaN")
+    if c in features_df.columns:
+        pct_nan = features_df[c].isna().mean() * 100
+        print(f"  {c:<35}: {pct_nan:.1f}% NaN")
+
+print(f"\n2026 fikstür yeni sütunlar ({len(future_df.columns)} toplam):")
+for c in ["altitude_m", "travel_km_diff", "temp_celsius",
+          "goals_per90_home", "goals_per90_away",
+          "coach_win_rate_home", "coach_win_rate_away"]:
+    if c in future_df.columns:
+        sample = future_df[c].describe()
+        print(f"  {c:<30}: mean={sample['mean']:.2f}, min={sample['min']:.1f}, max={sample['max']:.1f}")

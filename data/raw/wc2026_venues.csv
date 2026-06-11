@@ -1,0 +1,18 @@
+venue_key,full_name,city,country,lat,lon,altitude_m,avg_june_temp_c
+Estadio Azteca,Estadio Azteca,Mexico City,Mexico,19.3026,-99.1508,2240,15
+Estadio Akron,Estadio Akron,Guadalajara,Mexico,20.6849,-103.4666,1566,18
+Estadio BBVA,Estadio BBVA,Monterrey,Mexico,25.6694,-100.3093,538,28
+MetLife Stadium,MetLife Stadium,East Rutherford,USA,40.8128,-74.0742,4,24
+AT&T Stadium,AT&T Stadium,Arlington,USA,32.7481,-97.0924,167,32
+SoFi Stadium,SoFi Stadium,Inglewood,USA,33.9535,-118.3392,37,22
+NRG Stadium,NRG Stadium,Houston,USA,29.6851,-95.4108,15,32
+Arrowhead Stadium,Arrowhead Stadium,Kansas City,USA,39.0489,-94.4839,274,27
+Levi's Stadium,Levi's Stadium,Santa Clara,USA,37.4033,-121.9700,7,22
+Lincoln Financial,Lincoln Financial Field,Philadelphia,USA,39.9008,-75.1676,5,27
+Gillette Stadium,Gillette Stadium,Foxborough,USA,42.0909,-71.2643,50,23
+Rose Bowl,Rose Bowl,Pasadena,USA,34.1613,-118.1676,274,27
+Lumen Field,Lumen Field,Seattle,USA,47.5952,-122.3316,4,17
+Empower Field,Empower Field at Mile High,Denver,USA,39.7439,-105.0201,1600,21
+BC Place,BC Place,Vancouver,Canada,49.2767,-123.1115,5,17
+BMO Field,BMO Field,Toronto,Canada,43.6337,-79.4188,75,22
+Stade Olympique,Stade Olympique,Montreal,Canada,45.5597,-73.5511,57,23

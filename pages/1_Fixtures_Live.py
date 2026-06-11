@@ -217,6 +217,7 @@ for _, match in view_df.iterrows():
             _ih = float(_ih) if (_ih is not None and not (isinstance(_ih, float) and pd.isna(_ih))) else 0.0
             _ia = float(_ia) if (_ia is not None and not (isinstance(_ia, float) and pd.isna(_ia))) else 0.0
             odds_display = f"🎰 {_oh:.2f} / {_od:.2f} / {_oa:.2f}"
+            kelly_parts = []
             if has_pred and _ih > 0 and _ia > 0:
                 value_h = (ph or 0) - _ih
                 value_a = (pa or 0) - _ia
@@ -224,6 +225,17 @@ for _, match in view_df.iterrows():
                     odds_display += f"  🟩 VALUE Ev +{value_h:.0%}"
                 elif value_a > 0.08:
                     odds_display += f"  🟩 VALUE Dep +{value_a:.0%}"
+                # Kelly Criterion: f = (p*b - (1-p)) / b, burada b = decimal_odds - 1
+                # Yarı-Kelly kullanılır (daha güvenli)
+                for label, p_model, odds_dec in [("Ev", ph or 0, _oh), ("Dep", pa or 0, _oa)]:
+                    if odds_dec > 1.01 and p_model > 0:
+                        b = odds_dec - 1.0
+                        kelly_full = (p_model * b - (1.0 - p_model)) / b
+                        half_kelly = max(0.0, kelly_full / 2.0)
+                        if half_kelly > 0.005:
+                            kelly_parts.append(f"Kelly {label}: {half_kelly:.1%}")
+            if kelly_parts:
+                odds_display += "  📐 " + "  ".join(kelly_parts)
         else:
             odds_display = ""
     except Exception:

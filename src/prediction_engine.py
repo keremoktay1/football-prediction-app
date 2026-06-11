@@ -59,20 +59,34 @@ FEATURE_COLS = [
     "market_value_proxy_away",
     "top5_league_count_home",
     "top5_league_count_away",
-    # ── Yeni feature'lar (43 toplam) ──
+    # ── Trend & tutarsızlık ──
     "goal_trend_home", "goal_trend_away",
     "form_consistency_home", "form_consistency_away",
     "attack_ratio_home", "attack_ratio_away",
     "elo_form_interaction",
+    # ── Yeni: kadro kalite göstergeleri ──
+    "goals_per90_home", "goals_per90_away",
+    "assists_per90_home", "assists_per90_away",
+    # ── Yeni: antrenör ──
+    "coach_win_rate_home", "coach_win_rate_away",
+    "coach_wc_apps_home",  "coach_wc_apps_away",
+    # ── Yeni: venue & seyahat ──
+    "altitude_m",
+    "travel_km_diff",
+    "temp_celsius",
 ]
 
-POISSON_FEATURES = [
-    "elo_diff",
-    "attack_home",
-    "defense_away",
-    "neutral",
-    "tournament_weight",
+POISSON_HOME_FEATS = [
+    "elo_diff", "attack_home", "defense_away",
+    "weighted_form_home", "goals_for_last_5_home",
+    "altitude_m", "neutral", "tournament_weight",
 ]
+POISSON_AWAY_FEATS = [
+    "elo_diff", "attack_away", "defense_home",
+    "weighted_form_away", "goals_for_last_5_away",
+    "altitude_m", "neutral", "tournament_weight",
+]
+POISSON_FEATURES = POISSON_HOME_FEATS  # backward-compat alias
 
 UNKNOWN_ELO = 1700  # Playoff takımları için varsayılan
 
@@ -201,15 +215,21 @@ def predict_with_model(
             elif cls == 2:
                 p["p_away"] = float(proba[i])
 
-        # --- Poisson lambda ---
+        # --- Poisson lambda (home/away ayrı feature setleri) ---
         lh = la = None
         if home_goal and away_goal and poi_imp and poi_scl:
             try:
-                X_poi = pd.DataFrame([{c: features_row.get(c, np.nan) for c in POISSON_FEATURES}])
-                X_poi_imp = poi_imp.transform(X_poi)
-                X_poi_scl = poi_scl.transform(X_poi_imp)
-                lh = max(0.3, float(home_goal.predict(X_poi_scl)[0]))
-                la = max(0.3, float(away_goal.predict(X_poi_scl)[0]))
+                # Home gol modeli: home saldırı + away savunma
+                X_poi_h = pd.DataFrame([{c: features_row.get(c, np.nan) for c in POISSON_HOME_FEATS}])
+                X_poi_h_t = poi_scl.transform(poi_imp.transform(X_poi_h))
+                lh = max(0.3, float(home_goal.predict(X_poi_h_t)[0]))
+
+                # Away gol modeli: away saldırı + home savunma + ters elo_diff
+                away_row = {c: features_row.get(c, np.nan) for c in POISSON_AWAY_FEATS}
+                away_row["elo_diff"] = -(away_row.get("elo_diff") or 0)
+                X_poi_a = pd.DataFrame([away_row])
+                X_poi_a_t = poi_scl.transform(poi_imp.transform(X_poi_a))
+                la = max(0.3, float(away_goal.predict(X_poi_a_t)[0]))
             except Exception:
                 pass
 
