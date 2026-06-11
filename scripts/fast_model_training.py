@@ -430,7 +430,7 @@ _rf_base = RandomForestClassifier(
     class_weight="balanced", random_state=42, n_jobs=-1
 )
 rf_search = RSCV(
-    _rf_base, _rf_params, n_iter=15, cv=3,
+    _rf_base, _rf_params, n_iter=10, cv=3,
     scoring="neg_log_loss", random_state=42, n_jobs=-1, verbose=0,
 )
 rf_search.fit(X_train_t, y_train, sample_weight=train_weights)
@@ -509,6 +509,10 @@ print("\n[4b] Ensemble ağırlık optimizasyonu (scipy.minimize)...")
 _opt_probs_valid = [lr_valid_prob, poi_valid_prob, rf_valid_prob]
 _opt_probs_test  = [lr_test_prob,  poi_test_prob,  rf_test_prob]
 _model_names_opt = ["LR", "Poisson", "RF"]
+if HAS_XGB:
+    _opt_probs_valid.append(xgb_valid_prob)
+    _opt_probs_test.append(xgb_test_prob)
+    _model_names_opt.append("XGB")
 if HAS_LGB:
     _opt_probs_valid.append(lgb_valid_prob)
     _opt_probs_test.append(lgb_test_prob)
@@ -613,6 +617,9 @@ _future_probs_list = [
     rf_model.predict_proba(X_future_t),
 ]
 _future_model_names = ["LR", "Poisson", "RF"]
+if HAS_XGB:
+    _future_probs_list.append(xgb_model.predict_proba(X_future_t))
+    _future_model_names.append("XGB")
 if HAS_LGB:
     _future_probs_list.append(lgb_model.predict_proba(X_future_t))
     _future_model_names.append("LGB")

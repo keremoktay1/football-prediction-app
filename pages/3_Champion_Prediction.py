@@ -369,6 +369,81 @@ try:
     )
     st.plotly_chart(fig_line, use_container_width=True)
 
+    # ── Kura Zorluğu Analizi ──────────────────────────────────────────────────
+    with st.expander("🎲 Kura Zorluğu Analizi"):
+        if elo_map and fixtures is not None:
+            # Her takım için grup rakiplerinin listesini çıkar
+            team_opponents: dict = {}
+            team_group: dict = {}
+            for _, row in fixtures.iterrows():
+                ht = str(row["home_team"])
+                at = str(row["away_team"])
+                grp = str(row["group"])
+                team_group[ht] = grp
+                team_group[at] = grp
+                team_opponents.setdefault(ht, []).append(at)
+                team_opponents.setdefault(at, []).append(ht)
+
+            # Ortalama rakip Elo
+            diff_records = []
+            for team, opps in team_opponents.items():
+                avg_elo = sum(elo_map.get(o, 1700) for o in opps) / len(opps)
+                diff_records.append({
+                    "team":         team,
+                    "group":        team_group.get(team, "?"),
+                    "avg_opp_elo":  round(avg_elo, 1),
+                })
+
+            diff_df = (
+                pd.DataFrame(diff_records)
+                .sort_values("avg_opp_elo", ascending=False)
+                .reset_index(drop=True)
+            )
+
+            st.markdown(
+                "Grup rakiplerinin **ortalama Elo'su** — yüksek = zor kura, "
+                "düşük = kolay kura. Renk skalası: 🟢 kolay → 🔴 zor."
+            )
+
+            fig_diff = px.bar(
+                diff_df,
+                x="avg_opp_elo",
+                y="team",
+                orientation="h",
+                color="avg_opp_elo",
+                color_continuous_scale="RdYlGn_r",
+                text=diff_df["avg_opp_elo"].astype(str),
+                hover_data=["group"],
+                labels={"avg_opp_elo": "Ort. Rakip Elo", "team": "Takım", "group": "Grup"},
+            )
+            fig_diff.update_layout(
+                height=max(600, len(diff_df) * 18),
+                yaxis={"autorange": "reversed"},
+                showlegend=False,
+                coloraxis_showscale=True,
+                margin={"t": 20, "b": 10, "l": 10, "r": 80},
+                paper_bgcolor="#0E1117",
+                plot_bgcolor="#0E1117",
+                font_color="white",
+                xaxis_title="Ortalama Rakip Elo (Yüksek = Zor Kura)",
+            )
+            fig_diff.update_traces(textposition="outside")
+            st.plotly_chart(fig_diff, use_container_width=True)
+
+            # Grup bazlı güçlük özeti
+            st.markdown("**Grup Bazlı Ortalama Güçlük** (tüm takımların rakip Elo ortalaması)")
+            grp_summary = (
+                diff_df.groupby("group")["avg_opp_elo"]
+                .mean()
+                .round(1)
+                .reset_index()
+                .sort_values("avg_opp_elo", ascending=False)
+                .rename(columns={"group": "Grup", "avg_opp_elo": "Ort. Rakip Elo"})
+            )
+            st.dataframe(grp_summary, use_container_width=True, hide_index=True)
+        else:
+            st.info("Elo verisi veya fikstür verisi yüklenemedi.")
+
     # ── Faktörler expander ────────────────────────────────────────────────────
     with st.expander("⚙️ Simülasyon Faktörleri"):
         st.markdown("""

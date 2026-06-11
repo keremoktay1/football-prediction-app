@@ -78,7 +78,7 @@ VENUE_HOST: Dict[str, str] = {
 HIGH_ALT_TEAMS: Dict[str, int] = {
     "Mexico":        2240,
     "Colombia":      2600,
-    "Peru":           154,
+    "Peru":           500,
     "Ecuador":       2850,
     "Bolivia":       3640,
     "United States":  600,  # Denver etkisi — ortalama
@@ -204,6 +204,15 @@ TEAM_COORDS: Dict[str, Tuple[float, float]] = {
     "Cabo Verde":             (14.9, -23.5),
     # OFC
     "New Zealand":            (-36.9, 174.8),
+}
+
+# ── WC 2026 irtifa Elo deflasyonu ────────────────────────────────────────────
+# Bu takımların Elo'su tarihsel irtifa ev sahibi avantajıyla şişmiş durumda.
+# WC 2026 Kuzey Amerika'da (düşük rakım) oynandığı için bu avantaj geçersiz.
+ALTITUDE_ELO_DEFLATION: Dict[str, int] = {
+    "Colombia": -40,  # Bogotá 2600m — maçların büyüğü deniz seviyesinde
+    "Ecuador":  -35,  # Quito 2850m
+    "Bolivia":  -50,  # La Paz 3640m (WC'de değil ama yedek)
 }
 
 # ── Serin iklimli takımlar: sıcakta Elo cezası alır ──────────────────────────
@@ -426,14 +435,14 @@ def _simulate_ko_match(
 
     # ── 0. Maç Bazlı Elo Gürültüsü ───────────────────────────────────────────
     # σ=100: ~200 puan farkı olan maçlarda bile gerçekçi sürprizler mümkün
-    eh += float(rng.normal(0, 100))
-    ea += float(rng.normal(0, 100))
+    eh += float(rng.normal(0, 125))
+    ea += float(rng.normal(0, 125))
 
     # ── 1. WC Form Boost ──────────────────────────────────────────────────────
     if wc_pts is not None:
         pts_h = wc_pts.get(home, 4)
         pts_a = wc_pts.get(away, 4)
-        wc_boost = float(np.clip((pts_h - pts_a) * 8, -50, 50))
+        wc_boost = float(np.clip((pts_h - pts_a) * 5, -30, 30))
         eh += wc_boost
 
     # ── 2. Ev Sahibi Ülke Crowd Effect ───────────────────────────────────────
@@ -512,6 +521,13 @@ def run_simulation(
     """
     from data_loader import compute_penalty_stats
     rng = np.random.default_rng(seed)
+
+    # ── İrtifa Elo deflasyonu (WC 2026 bağlamı) ───────────────────────────────
+    # Orijinal elo_map'i değiştirmemek için kopya oluştur
+    elo_map = dict(elo_map)
+    for _team, _delta in ALTITUDE_ELO_DEFLATION.items():
+        if _team in elo_map:
+            elo_map[_team] = elo_map[_team] + _delta
 
     # ── Penaltı istatistiklerini yükle ────────────────────────────────────────
     penalty_stats = compute_penalty_stats()
@@ -641,6 +657,7 @@ def run_simulation(
         # 4. Eleme turunu simüle et
         ko_winners: Dict[int, str] = {}
         bt_cursor = [0]
+        sim_elo = dict(elo_map)  # Bu simülasyona özel Elo state
 
         for ko in ko_list:
             mid  = ko["match_id"]
@@ -685,15 +702,23 @@ def run_simulation(
             )
 
             if ko["round"] == "Third-place playoff":
-                w, l = _simulate_ko_match(home, away, elo_map, rng, **ko_kwargs)
+                w, l = _simulate_ko_match(home, away, sim_elo, rng, **ko_kwargs)
                 ko_winners[mid] = w
                 ko_winners[f"loser_{mid}"] = l
                 counts[w]["third"] += 1
                 counts[l]["fourth"] += 1
             else:
-                w, l = _simulate_ko_match(home, away, elo_map, rng, **ko_kwargs)
+                w, l = _simulate_ko_match(home, away, sim_elo, rng, **ko_kwargs)
                 ko_winners[mid] = w
                 ko_winners[f"loser_{mid}"] = l
+
+            # Dinamik Elo güncelle (K=30) — kazanan yükselir, kaybeden düşer
+            elo_w = sim_elo.get(w, UNKNOWN_ELO)
+            elo_l = sim_elo.get(l, UNKNOWN_ELO)
+            expected_w = 1.0 / (1.0 + 10.0 ** (-(elo_w - elo_l) / 500.0))
+            K_SIM = 30
+            sim_elo[w] = elo_w + K_SIM * (1.0 - expected_w)
+            sim_elo[l] = elo_l - K_SIM * (1.0 - expected_w)
 
             # Oynanan tarihi kaydet
             if ko_date_str:

@@ -1,7 +1,74 @@
+# ── Python ────────────────────────────────────────────────────────────────────
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+*.pdb
+*.egg-info/
+dist/
+build/
+*.egg
+.Python
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
 .DS_Store
-=*
-.streamlit/secrets.toml
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+
+# ── IDE / Editör ──────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
 notebooks/.ipynb_checkpoints/
+
+# ── Streamlit ─────────────────────────────────────────────────────────────────
+.streamlit/secrets.toml
+.streamlit/credentials.toml
+
+# ── Ortam / Secrets ───────────────────────────────────────────────────────────
+.env
+.env.*
+venv/
+.venv/
+env/
+*.key
+*.pem
+secrets.json
+
+# ── Büyük ham veri dosyaları (script'ler ile yeniden üretilir) ────────────────
+# Bu dosyalar repo'da tutulmaz; README'deki talimatları izle.
+data/raw/results.csv
+data/raw/goalscorers.csv
+data/raw/players_data-*.csv
+data/raw/elo_ratings_wc2026.csv
+data/raw/shootouts.csv
+
+# ── Büyük model dosyaları (fast_model_training.py ile yeniden üretilir) ───────
+models/rf_model.pkl
+models/lgb_model.pkl
+models/xgb_model.pkl
+
+# ── Üretilmiş işlenmiş veri ───────────────────────────────────────────────────
+data/processed/features_historical.csv
+
+# ── Canlı turnuva durumu (yerel, kişisel) ────────────────────────────────────
+data/processed/match_updates.csv
+data/processed/elo_current.csv
+data/processed/odds_cache.csv
+
+# ── pip shell redirect hataları (pip install pkg>=x.y → =x.y dosyası) ────────
+=*
+
+# ── Test / Geçici ─────────────────────────────────────────────────────────────
+*.log
+tmp/
+temp/
