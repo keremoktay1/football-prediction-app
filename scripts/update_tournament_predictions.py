@@ -23,6 +23,7 @@ import os
 import sys
 import json
 import pickle
+import joblib as joblib_mod
 import warnings
 import numpy as np
 import pandas as pd
@@ -42,6 +43,10 @@ PREDICTIONS_PATH  = FILES["predictions"]
 UPDATES_PATH      = os.path.join(PROCESSED_DIR, "match_updates.csv")
 GROUP_FIXTURES_PATH = FILES["group_fixtures"]
 ENSEMBLE_WEIGHTS_PATH = os.path.join(PROCESSED_DIR, "ensemble_weights.json")
+ELO_CURRENT_PATH  = os.path.join(PROCESSED_DIR, "elo_current.csv")
+
+# FIFA Dünya Kupası K-faktörü (standart aralık 20-40)
+ELO_K_WC = 40
 
 from prediction_engine import FEATURE_COLS, POISSON_FEATURES
 
@@ -61,8 +66,7 @@ def _load_models() -> dict:
     ]:
         path = os.path.join(MODELS_DIR, fname)
         if os.path.exists(path):
-            with open(path, "rb") as f:
-                models[name] = pickle.load(f)
+            models[name] = joblib_mod.load(path)
     return models
 
 
@@ -130,27 +134,111 @@ def _blend(old_val: float, wc_val: float, blend: float) -> float:
     return old_val * (1.0 - blend) + wc_val * blend
 
 
+# ── WC sonuçlarına göre Elo güncelleme ────────────────────────────────────────
+
+def _update_elo_from_wc(
+    updates: pd.DataFrame,
+    fixtures: pd.DataFrame,
+) -> Dict[str, float]:
+    """
+    Oynanan WC maçlarını kronolojik sırayla işleyerek Elo'ları günceller.
+    Her maçta standart Elo formülü uygulanır (K=40).
+
+    Returns: {team: updated_elo} — tüm takımlar dahil, sadece oynayanlar değişir.
+    """
+    elo_path = FILES.get("elo", "")
+    if not elo_path or not os.path.exists(elo_path):
+        print("[WARN] Elo dosyası bulunamadı — Elo güncellemesi atlandı.")
+        return {}
+
+    elo_df = pd.read_csv(elo_path)
+    if "snapshot_date" in elo_df.columns:
+        elo_df["snapshot_date"] = pd.to_datetime(elo_df["snapshot_date"], errors="coerce")
+        latest = elo_df["snapshot_date"].max()
+        elo_df = elo_df[elo_df["snapshot_date"] == latest]
+
+    elo_map: Dict[str, float] = {}
+    if "country" in elo_df.columns and "rating" in elo_df.columns:
+        for _, r in elo_df.iterrows():
+            elo_map[str(r["country"])] = float(r["rating"])
+
+    if not elo_map:
+        return {}
+
+    # Maç tarih ve takım haritaları
+    date_map: Dict[int, str] = {}
+    fix_map: Dict[int, tuple] = {}
+    for _, row in fixtures.iterrows():
+        mid = int(row["match_id"])
+        date_map[mid] = str(row.get("date_utc", ""))
+        fix_map[mid] = (str(row["home_team"]), str(row["away_team"]))
+
+    # Oynanan maçları kronolojik sırala (tarihe göre)
+    played: list = []
+    for _, upd in updates.iterrows():
+        try:
+            mid = int(upd["match_id"])
+            hs  = int(upd["home_score"])
+            as_ = int(upd["away_score"])
+            played.append((date_map.get(mid, ""), mid, hs, as_))
+        except (ValueError, TypeError):
+            continue
+    played.sort(key=lambda x: x[0])  # ISO tarih → kronolojik
+
+    # Elo güncelleme döngüsü
+    for _, mid, hs, as_ in played:
+        if mid not in fix_map:
+            continue
+        ht, at = fix_map[mid]
+        elo_h = elo_map.get(ht, 1700)
+        elo_a = elo_map.get(at, 1700)
+
+        # Beklenen kazanma olasılığı (home perspektifinden)
+        expected_h = 1.0 / (1.0 + 10.0 ** (-(elo_h - elo_a) / 400.0))
+
+        # Gerçek sonuç: galibiyet=1, beraberlik=0.5, mağlubiyet=0
+        if hs > as_:
+            score_h, score_a = 1.0, 0.0
+        elif hs == as_:
+            score_h, score_a = 0.5, 0.5
+        else:
+            score_h, score_a = 0.0, 1.0
+
+        elo_map[ht] = elo_h + ELO_K_WC * (score_h - expected_h)
+        elo_map[at] = elo_a + ELO_K_WC * (score_a - (1.0 - expected_h))
+
+    return elo_map
+
+
 # ── Feature güncelleme ────────────────────────────────────────────────────────
 
 def _update_features(
     features: pd.DataFrame,
     played_ids: set,
     wc_stats: Dict[str, dict],
+    updated_elo: Dict[str, float],
 ) -> pd.DataFrame:
     """
     Oynanmamış maçlar için feature'ları WC verisiyle günceller.
     Oynanmış maçlara dokunmaz.
+
+    Güncellenenler:
+      - attack_home/away, defense_home/away  (WC gol istatistikleri)
+      - weighted_form_home/away, form_diff   (WC puan formu)
+      - elo_home, elo_away, elo_diff         (WC sonuçlarına göre K=40 Elo)
+      - elo_form_interaction                 (elo_diff × weighted_form_home)
     """
     features = features.copy()
 
     for idx, row in features.iterrows():
         mid = int(row["match_id"])
         if mid in played_ids:
-            continue  # Oynanmış maç — atla
+            continue  # Oynanmış maç — dokunma
 
         home_team = str(row["home_team"])
         away_team = str(row["away_team"])
 
+        # ── Saldırı / Savunma / Form güncellemesi ────────────────────────────
         for side, team in [("home", home_team), ("away", away_team)]:
             if team not in wc_stats:
                 continue
@@ -162,25 +250,39 @@ def _update_features(
 
             blend = min(wc_matches / 3.0, 1.0)
 
-            # Saldırı gücü güncelle
             wc_attack = (s["wc_gf"] / wc_matches) / BASE_GOAL_RATE
             old_attack = float(row.get(f"attack_{side}", 1.0))
             features.at[idx, f"attack_{side}"] = _blend(old_attack, wc_attack, blend)
 
-            # Savunma gücü güncelle (düşük = iyi, WC'de az gol yemek iyidir)
             wc_defense = (s["wc_ga"] / wc_matches) / BASE_GOAL_RATE
             old_defense = float(row.get(f"defense_{side}", 1.0))
             features.at[idx, f"defense_{side}"] = _blend(old_defense, wc_defense, blend)
 
-            # Form güncelle (maç başına puan)
-            wc_form = s["wc_pts"] / wc_matches  # 0-3 arasında
+            wc_form = s["wc_pts"] / wc_matches  # 0-3
             old_form = float(row.get(f"weighted_form_{side}", 1.0))
             features.at[idx, f"weighted_form_{side}"] = _blend(old_form, wc_form, blend)
 
-        # form_diff'i yeniden hesapla
+        # form_diff yeniden hesapla
         new_form_home = float(features.at[idx, "weighted_form_home"])
         new_form_away = float(features.at[idx, "weighted_form_away"])
         features.at[idx, "form_diff"] = new_form_home - new_form_away
+
+        # ── Elo güncellemesi ──────────────────────────────────────────────────
+        elo_h = updated_elo.get(home_team)
+        elo_a = updated_elo.get(away_team)
+
+        if elo_h is not None and "elo_home" in features.columns:
+            features.at[idx, "elo_home"] = round(elo_h, 1)
+        if elo_a is not None and "elo_away" in features.columns:
+            features.at[idx, "elo_away"] = round(elo_a, 1)
+        if elo_h is not None and elo_a is not None and "elo_diff" in features.columns:
+            new_diff = elo_h - elo_a
+            features.at[idx, "elo_diff"] = round(new_diff, 1)
+            # elo_form_interaction = (elo_diff / 400) × (form_home - form_away)
+            if "elo_form_interaction" in features.columns:
+                features.at[idx, "elo_form_interaction"] = round(
+                    (new_diff / 400.0) * (new_form_home - new_form_away), 4
+                )
 
     return features
 
@@ -330,6 +432,20 @@ def main():
     wc_stats = _calc_wc_stats(updates, fixtures)
     print(f"[OK]  {len(wc_stats)} takım için WC istatistikleri hesaplandı.")
 
+    # 3b. Elo'ları WC sonuçlarına göre güncelle
+    updated_elo = _update_elo_from_wc(updates, fixtures)
+    if updated_elo:
+        elo_rows = [{"team": t, "elo": round(v, 1)} for t, v in sorted(updated_elo.items())]
+        pd.DataFrame(elo_rows).to_csv(ELO_CURRENT_PATH, index=False)
+        print(f"[OK]  Güncel Elo {ELO_CURRENT_PATH} kaydedildi ({len(updated_elo)} takım).")
+        # Değişimleri göster
+        changed = [(t, v) for t, v in updated_elo.items()
+                   if t in wc_stats]  # sadece WC'de oynayan takımlar
+        for team, new_elo in sorted(changed, key=lambda x: -abs(x[1])):
+            print(f"       {team}: {new_elo:.1f}")
+    else:
+        print("[WARN] Elo güncellemesi yapılamadı.")
+
     # 4. features_2026_fixtures.csv yükle
     if not os.path.exists(FEATURES_PATH):
         print(f"[ERR] features_2026_fixtures.csv bulunamadı: {FEATURES_PATH}")
@@ -339,7 +455,7 @@ def main():
     print(f"[OK]  {len(features)} maç için feature'lar yüklendi.")
 
     # 5. Feature'ları güncelle (sadece oynanmamış maçlar)
-    features_updated = _update_features(features, played_ids, wc_stats)
+    features_updated = _update_features(features, played_ids, wc_stats, updated_elo)
     unplayed_count = len(features_updated[~features_updated["match_id"].isin(played_ids)])
     print(f"[OK]  {unplayed_count} oynanmamış maç için feature'lar güncellendi.")
 

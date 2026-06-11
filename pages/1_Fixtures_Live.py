@@ -106,6 +106,212 @@ if only_played:
 
 st.markdown("---")
 
+# ── Tahmin Performans Dashboard ───────────────────────────────────────────────
+with st.expander("📊 Tahmin Performansı & İstatistikler", expanded=False):
+    try:
+        import plotly.graph_objects as go
+        import plotly.express as px
+
+        # ── Temel metrikler ──────────────────────────────────────────────────
+        played_ids = [mid for mid in update_dict]
+        total_played = len(played_ids)
+        total_goals = sum(hs + as_ for hs, as_ in update_dict.values())
+
+        # Tahmin sözlüğü oluştur
+        _pred_dict: dict = {}
+        if predictions is not None and not predictions.empty:
+            for _, _r in predictions.iterrows():
+                try:
+                    _mid = int(_r["match_id"])
+                    _pred_dict[_mid] = {
+                        "ph": float(_r.get("p_home", 1/3)),
+                        "pd": float(_r.get("p_draw", 1/3)),
+                        "pa": float(_r.get("p_away", 1/3)),
+                        "lh": float(_r["lambda_home"]) if "lambda_home" in _r.index else None,
+                        "la": float(_r["lambda_away"]) if "lambda_away" in _r.index else None,
+                    }
+                except (ValueError, TypeError, KeyError):
+                    pass
+
+        # Doğruluk hesabı
+        correct = 0
+        cat_correct = {"H": 0, "D": 0, "A": 0}
+        cat_total   = {"H": 0, "D": 0, "A": 0}
+        wrong_count = 0
+
+        for mid_k, (hs, as_) in update_dict.items():
+            if mid_k not in _pred_dict:
+                continue
+            actual_k = "H" if hs > as_ else ("D" if hs == as_ else "A")
+            pred = _pred_dict[mid_k]
+            pred_k = max({"H": pred["ph"], "D": pred["pd"], "A": pred["pa"]},
+                         key=lambda k: {"H": pred["ph"], "D": pred["pd"], "A": pred["pa"]}[k])
+            cat_total[actual_k] = cat_total.get(actual_k, 0) + 1
+            if actual_k == pred_k:
+                correct += 1
+                cat_correct[actual_k] = cat_correct.get(actual_k, 0) + 1
+            else:
+                wrong_count += 1
+
+        matched_count = sum(cat_total.values())
+        accuracy_pct  = (correct / matched_count * 100) if matched_count > 0 else 0.0
+
+        # ── Metrik kartlar ───────────────────────────────────────────────────
+        mc1, mc2, mc3, mc4 = st.columns(4)
+        mc1.metric("Oynanan Maç", total_played)
+        mc2.metric("Doğru Tahmin", correct)
+        mc3.metric("Doğruluk %", f"{accuracy_pct:.1f}%")
+        mc4.metric("Toplam Gol", total_goals)
+
+        if matched_count == 0:
+            st.info("Henüz karşılaştırılacak tahmin + sonuç çifti yok.")
+        else:
+            pc1, pc2 = st.columns(2)
+
+            # ── Confusion Donut Chart ─────────────────────────────────────────
+            with pc1:
+                st.markdown("**Tahmin Kategorisi Doğruluğu**")
+                donut_labels = [
+                    "Ev Kazandı ✓", "Beraberlik ✓", "Deplasman ✓", "Yanlış"
+                ]
+                donut_values = [
+                    cat_correct.get("H", 0),
+                    cat_correct.get("D", 0),
+                    cat_correct.get("A", 0),
+                    wrong_count,
+                ]
+                donut_colors = ["#2ecc71", "#f39c12", "#3498db", "#e74c3c"]
+                fig_donut = go.Figure(go.Pie(
+                    labels=donut_labels,
+                    values=donut_values,
+                    hole=0.5,
+                    marker_colors=donut_colors,
+                    textinfo="label+percent",
+                    textfont_size=11,
+                ))
+                fig_donut.update_layout(
+                    height=300,
+                    paper_bgcolor="#0E1117",
+                    font_color="white",
+                    showlegend=False,
+                    margin={"t": 10, "b": 10, "l": 10, "r": 10},
+                )
+                st.plotly_chart(fig_donut, use_container_width=True)
+
+            # ── Beklenen vs Gerçek Gol Scatter ───────────────────────────────
+            with pc2:
+                st.markdown("**Beklenen vs Gerçek Gol (Her Maç)**")
+                xg_rows = []
+                for _mid, (hs, as_) in update_dict.items():
+                    pred = _pred_dict.get(_mid)
+                    if pred and pred["lh"] is not None and pred["la"] is not None:
+                        xg_rows.append({
+                            "lambda_home": pred["lh"],
+                            "lambda_away": pred["la"],
+                            "actual_home": hs,
+                            "actual_away": as_,
+                        })
+                if xg_rows:
+                    xg_df = pd.DataFrame(xg_rows)
+                    fig_xg = go.Figure()
+                    fig_xg.add_trace(go.Scatter(
+                        x=xg_df["lambda_home"],
+                        y=xg_df["actual_home"],
+                        mode="markers",
+                        name="Ev Sahibi",
+                        marker={"color": "#3498db", "size": 7},
+                    ))
+                    fig_xg.add_trace(go.Scatter(
+                        x=xg_df["lambda_away"],
+                        y=xg_df["actual_away"],
+                        mode="markers",
+                        name="Deplasman",
+                        marker={"color": "#e74c3c", "size": 7},
+                    ))
+                    # Diagonal çizgi
+                    _max_val = max(
+                        xg_df[["lambda_home", "lambda_away", "actual_home", "actual_away"]].max().max(),
+                        3.0
+                    )
+                    fig_xg.add_shape(
+                        type="line", x0=0, y0=0, x1=_max_val, y1=_max_val,
+                        line={"color": "white", "width": 1, "dash": "dot"},
+                    )
+                    fig_xg.update_layout(
+                        height=300,
+                        paper_bgcolor="#0E1117",
+                        plot_bgcolor="#1a1a2e",
+                        font_color="white",
+                        xaxis_title="Beklenen Gol (λ)",
+                        yaxis_title="Gerçek Gol",
+                        margin={"t": 10, "b": 30, "l": 40, "r": 10},
+                        legend={"orientation": "h", "yanchor": "bottom", "y": 1.0},
+                    )
+                    st.plotly_chart(fig_xg, use_container_width=True)
+                else:
+                    st.info("Gol beklentisi verisi yok.")
+
+            # ── En Büyük Sürpriz Maçlar (Upsets) ─────────────────────────────
+            st.markdown("**En Büyük Sürprizler — Favori Kaybetti**")
+            upsets = []
+            for _mid, (hs, as_) in update_dict.items():
+                pred = _pred_dict.get(_mid)
+                if pred is None:
+                    continue
+                actual_k = "H" if hs > as_ else ("D" if hs == as_ else "A")
+                pred_k   = max({"H": pred["ph"], "D": pred["pd"], "A": pred["pa"]},
+                               key=lambda k: {"H": pred["ph"], "D": pred["pd"], "A": pred["pa"]}[k])
+                if actual_k == pred_k:
+                    continue  # Doğru tahmin, sürpriz değil
+                # Sürpriz büyüklüğü: favori olasılığı - gerçek sonuç olasılığı
+                fav_prob    = max(pred["ph"], pred["pd"], pred["pa"])
+                actual_prob = {"H": pred["ph"], "D": pred["pd"], "A": pred["pa"]}[actual_k]
+                upset_size  = fav_prob - actual_prob
+
+                # Takım adlarını bul
+                _fix_row = merged[merged["match_id"] == _mid]
+                if _fix_row.empty:
+                    continue
+                _home = str(_fix_row.iloc[0]["home_team"])
+                _away = str(_fix_row.iloc[0]["away_team"])
+                _score = f"{hs}–{as_}"
+                upsets.append({
+                    "match": f"{_home} vs {_away}",
+                    "score": _score,
+                    "upset_size": round(upset_size * 100, 1),
+                })
+
+            if upsets:
+                upset_df = pd.DataFrame(upsets).sort_values("upset_size", ascending=False).head(10)
+                fig_ups = px.bar(
+                    upset_df,
+                    x="upset_size",
+                    y="match",
+                    text="score",
+                    orientation="h",
+                    labels={"upset_size": "Sürpriz Büyüklüğü (%)", "match": "Maç"},
+                    color="upset_size",
+                    color_continuous_scale="Reds",
+                )
+                fig_ups.update_layout(
+                    height=max(250, len(upset_df) * 35),
+                    yaxis={"autorange": "reversed"},
+                    paper_bgcolor="#0E1117",
+                    plot_bgcolor="#0E1117",
+                    font_color="white",
+                    coloraxis_showscale=False,
+                    margin={"t": 10, "b": 10, "l": 10, "r": 10},
+                )
+                fig_ups.update_traces(textposition="outside")
+                st.plotly_chart(fig_ups, use_container_width=True)
+            else:
+                st.info("Henüz sürpriz sonuç yok (veya tüm tahminler doğru!).")
+
+    except ImportError:
+        st.info("Plotly kurulu değil; performans grafiği gösterilemiyor.")
+    except Exception as _dash_exc:
+        st.warning(f"Performans dashboard hatası: {_dash_exc}")
+
 # ── Puan tablosu (isteğe bağlı) ──────────────────────────────────────────────
 if show_standings:
     try:

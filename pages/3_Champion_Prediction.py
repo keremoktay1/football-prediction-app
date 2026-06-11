@@ -209,6 +209,195 @@ try:
         )
         st.plotly_chart(fig_heat, use_container_width=True)
 
+    # ── Grafik 1: Konfederasyon Treemap ──────────────────────────────────────
+    st.markdown("#### Konfederasyon Bazlı Şampiyonluk Dağılımı")
+
+    CONFEDERATION = {
+        # UEFA
+        "France": "UEFA", "Germany": "UEFA", "Spain": "UEFA", "England": "UEFA",
+        "Portugal": "UEFA", "Netherlands": "UEFA", "Belgium": "UEFA", "Italy": "UEFA",
+        "Croatia": "UEFA", "Denmark": "UEFA", "Austria": "UEFA", "Switzerland": "UEFA",
+        "Serbia": "UEFA", "Ukraine": "UEFA", "Poland": "UEFA", "Türkiye": "UEFA",
+        "Turkey": "UEFA", "Hungary": "UEFA", "Slovakia": "UEFA", "Slovenia": "UEFA",
+        "Albania": "UEFA", "Scotland": "UEFA", "Romania": "UEFA", "Czechia": "UEFA",
+        "Czech Republic": "UEFA", "Wales": "UEFA", "Georgia": "UEFA",
+        "North Macedonia": "UEFA", "Kosovo": "UEFA", "Bosnia and Herzegovina": "UEFA",
+        "Montenegro": "UEFA", "Finland": "UEFA", "Norway": "UEFA", "Sweden": "UEFA",
+        # CONMEBOL
+        "Brazil": "CONMEBOL", "Argentina": "CONMEBOL", "Uruguay": "CONMEBOL",
+        "Colombia": "CONMEBOL", "Chile": "CONMEBOL", "Ecuador": "CONMEBOL",
+        "Peru": "CONMEBOL", "Paraguay": "CONMEBOL", "Venezuela": "CONMEBOL",
+        "Bolivia": "CONMEBOL",
+        # CONCACAF
+        "United States": "CONCACAF", "Mexico": "CONCACAF", "Canada": "CONCACAF",
+        "Costa Rica": "CONCACAF", "Jamaica": "CONCACAF", "Honduras": "CONCACAF",
+        "El Salvador": "CONCACAF", "Panama": "CONCACAF", "Trinidad & Tobago": "CONCACAF",
+        "Haiti": "CONCACAF",
+        # AFC
+        "Japan": "AFC", "South Korea": "AFC", "Iran": "AFC", "Saudi Arabia": "AFC",
+        "Australia": "AFC", "Qatar": "AFC", "Iraq": "AFC", "Jordan": "AFC",
+        "Uzbekistan": "AFC", "China PR": "AFC", "China": "AFC",
+        # CAF
+        "Morocco": "CAF", "Senegal": "CAF", "Nigeria": "CAF", "Cameroon": "CAF",
+        "Ghana": "CAF", "Egypt": "CAF", "Côte d'Ivoire": "CAF", "Mali": "CAF",
+        "Algeria": "CAF", "Tunisia": "CAF", "South Africa": "CAF",
+        # OFC
+        "New Zealand": "OFC",
+    }
+    CONF_COLORS = {
+        "UEFA":     "#1f77b4",
+        "CONMEBOL": "#2ca02c",
+        "CONCACAF": "#d62728",
+        "AFC":      "#ff7f0e",
+        "CAF":      "#9467bd",
+        "OFC":      "#8c564b",
+    }
+
+    top24 = sim_df.head(24).copy()
+    top24["p_champion_pct"] = (top24["p_champion"] * 100).round(2)
+    top24["confederation"] = top24["team"].map(lambda t: CONFEDERATION.get(t, "Diğer"))
+
+    fig_tree = px.treemap(
+        top24,
+        path=["confederation", "team"],
+        values="p_champion_pct",
+        color="confederation",
+        color_discrete_map=CONF_COLORS,
+        title="Şampiyonluk Olasılığı — Konfederasyon Dağılımı",
+        labels={"p_champion_pct": "P(Şampiyon) %"},
+    )
+    fig_tree.update_layout(
+        height=480,
+        paper_bgcolor="#0E1117",
+        font_color="white",
+        margin={"t": 50, "b": 10, "l": 10, "r": 10},
+    )
+    fig_tree.update_traces(textinfo="label+value")
+    st.plotly_chart(fig_tree, use_container_width=True)
+
+    # ── Grafik 2: Elo vs P(Şampiyon) Scatter ────────────────────────────────
+    st.markdown("#### Elo Derecesi vs Şampiyonluk Olasılığı")
+    if elo_map:
+        scatter_df = sim_df.head(32).copy()
+        scatter_df["elo"] = scatter_df["team"].map(lambda t: elo_map.get(t, None))
+        scatter_df["p_champion_pct"] = (scatter_df["p_champion"] * 100).round(2)
+        scatter_df["confederation"] = scatter_df["team"].map(
+            lambda t: CONFEDERATION.get(t, "Diğer")
+        )
+        scatter_df = scatter_df.dropna(subset=["elo"])
+
+        fig_sc = px.scatter(
+            scatter_df,
+            x="elo",
+            y="p_champion_pct",
+            text="team",
+            color="confederation",
+            color_discrete_map=CONF_COLORS,
+            trendline="ols",
+            labels={"elo": "Elo Derecesi", "p_champion_pct": "P(Şampiyon) %",
+                    "confederation": "Konfederasyon"},
+            title="Elo vs Şampiyonluk Olasılığı (trend üzerindekiler = simülasyonda öne çıkanlar)",
+        )
+        fig_sc.update_traces(
+            textposition="top center",
+            selector={"mode": "markers+text"},
+        )
+        fig_sc.update_layout(
+            height=520,
+            paper_bgcolor="#0E1117",
+            plot_bgcolor="#1a1a2e",
+            font_color="white",
+            margin={"t": 50, "b": 10, "l": 10, "r": 10},
+        )
+        st.plotly_chart(fig_sc, use_container_width=True)
+    else:
+        st.info("Elo verisi yüklenemedi; scatter grafiği atlandı.")
+
+    # ── Grafik 3: Top-8 Takım Eleme Yolculuğu ───────────────────────────────
+    st.markdown("#### Top 8 Takım — Eleme Turu Yolculuğu")
+
+    _stages = [
+        ("p_round32",  "Son 32"),
+        ("p_round16",  "Son 16"),
+        ("p_quarter",  "Çeyrek"),
+        ("p_semi",     "Yarı Final"),
+        ("p_finalist", "Final"),
+        ("p_champion", "Şampiyon"),
+    ]
+    stage_cols = [col for col, _ in _stages if col in sim_df.columns]
+    stage_labels = [lbl for col, lbl in _stages if col in sim_df.columns]
+
+    top8 = sim_df.head(8).copy()
+    top8_long = top8.melt(
+        id_vars="team",
+        value_vars=stage_cols,
+        var_name="round_col",
+        value_name="probability",
+    )
+    label_map = {col: lbl for col, lbl in _stages}
+    top8_long["round_label"] = top8_long["round_col"].map(label_map)
+    top8_long["probability_pct"] = (top8_long["probability"] * 100).round(1)
+    top8_long["round_order"] = top8_long["round_col"].map(
+        {col: i for i, (col, _) in enumerate(_stages)}
+    )
+    top8_long = top8_long.sort_values("round_order")
+
+    top3_teams = sim_df.head(3)["team"].tolist()
+
+    fig_line = px.line(
+        top8_long,
+        x="round_label",
+        y="probability_pct",
+        color="team",
+        markers=True,
+        labels={"round_label": "Tur", "probability_pct": "Olasılık %", "team": "Takım"},
+        title="Top 8 Takım — Tur Bazlı Eleme Olasılıkları",
+        category_orders={"round_label": stage_labels},
+    )
+    for trace in fig_line.data:
+        if trace.name in top3_teams:
+            trace.line.width = 3
+        else:
+            trace.line.width = 1.5
+            trace.opacity = 0.6
+    fig_line.update_layout(
+        height=420,
+        paper_bgcolor="#0E1117",
+        plot_bgcolor="#1a1a2e",
+        font_color="white",
+        margin={"t": 50, "b": 10, "l": 10, "r": 10},
+    )
+    st.plotly_chart(fig_line, use_container_width=True)
+
+    # ── Faktörler expander ────────────────────────────────────────────────────
+    with st.expander("⚙️ Simülasyon Faktörleri"):
+        st.markdown("""
+**0. Maç Bazlı Elo Gürültüsü** — Her maçta her takımın Elo'suna ~N(0, 100) rastgele gürültü eklenir.
+Bu, gerçek futbolun tahmin edilemezliğini yansıtır; 200 puan favorinin bile her maçta sürpriz riski vardır.
+Ayrıca Elo ölçeği 400→500'e genişletildi — 200 Elo fark artık %76 değil %72 olasılık.
+
+**1. WC Form Boost** — Grup aşamasında kazanan takımlar eleme turunda +Elo bonusu alır.
+Her puan farkı ±8 Elo (maks ±50).
+
+**2. Ev Sahibi Ülke Kalabalık Etkisi** — ABD (+40), Meksika (+50), Kanada (+35) Elo bonusu,
+kendi stadyumlarında oynarken.
+
+**3. Penaltı İstatistikleri** — Çok yakın maçlarda (win prob 0.40–0.60),
+tarihsel penaltı kazanma oranı kazananı hafifçe etkiler (ağırlık: %15).
+
+**4. Dinlenme Günü / Yorgunluk** — 4 günden az dinlenme = her gün için -8 Elo (maks -24).
+
+**5. İrtifa Adaptasyonu** — Azteca (2240m) ve Denver (1600m) gibi yüksek rakımlı stadlarda,
+yüksek rakımlı ülkelerden (Meksika, Kolombiya, Ekvador vb.) gelen takımlar avantaj sağlar.
+
+**6. Sıcaklık Stresi** — 26°C üzerinde oynanan maçlarda (Houston 32°C, Dallas 32°C vb.),
+serin iklimli Avrupalı takımlar her 1°C için -3 Elo cezası alır (maks -24 Elo).
+Brezilya, Arjantin, Fas, Senegal gibi sıcak iklimli takımlar etkilenmez.
+
+**7. Seyahat Yorgunluğu** — 9,000 km'den uzun uçuş gerektiren maçlarda takım performansı düşer.
+Her 1,000 km (eşik üzerinde) = -4 Elo (maks -20 Elo). Japonya/Güney Kore ABD'de dezavantajlı.
+        """)
+
 except ImportError:
     # Plotly yoksa tablo göster
     top16 = sim_df.head(16).copy()

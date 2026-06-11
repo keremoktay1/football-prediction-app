@@ -42,6 +42,6 @@ TEAM_NAME_MAP = {
 
 # Model parametreleri
 ROLLING_FORM_WINDOW = 5      # Son N maç
-N_SIMULATIONS       = 10_000 # Monte Carlo simülasyon sayısı
-ELO_K_FACTOR        = 20     # Elo K faktörü (güncelleme büyüklüğü)
+N_SIMULATIONS       = 5_000  # Monte Carlo simülasyon sayısı (run_simulation varsayılanı)
+ELO_K_FACTOR        = 40     # Elo K faktörü — WC maçlarında kullanılan değer
 BASE_GOAL_RATE      = 1.35   # Ortalama gol/maç tahmini (uluslararası futbol)

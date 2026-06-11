@@ -302,9 +302,24 @@ def load_model_comparison() -> Optional[pd.DataFrame]:
 def build_elo_map(elo_df: Optional[pd.DataFrame] = None) -> dict:
     """
     team_name → elo_rating sözlüğü döner.
-    Bilinmeyen takımlar (playoff takımları) için varsayılan 1700 kullanılır.
+
+    Öncelik sırası:
+      1. data/processed/elo_current.csv — WC sonuçlarına göre K=40 ile güncellenmiş Elo
+         (update_tournament_predictions.py çalıştırıldığında oluşur)
+      2. data/raw/elo_ratings_wc2026.csv — turnuva öncesi orijinal Elo
+
+    Bilinmeyen takımlar için varsayılan 1700 kullanılır.
     """
-    DEFAULT_ELO = 1700
+    elo_current_path = os.path.join(PROCESSED_DIR, "elo_current.csv")
+    if os.path.exists(elo_current_path):
+        try:
+            cur = pd.read_csv(elo_current_path)
+            if "team" in cur.columns and "elo" in cur.columns and not cur.empty:
+                return {str(r["team"]): float(r["elo"]) for _, r in cur.iterrows()}
+        except Exception:
+            pass  # bozuksa orijinale dön
+
+    # Orijinal Elo (fallback)
     if elo_df is None:
         elo_df = load_elo_ratings()
     if elo_df is None or elo_df.empty:
@@ -325,3 +340,44 @@ def load_per_model_predictions() -> Optional[pd.DataFrame]:
         return pd.read_csv(path)
     except Exception:
         return None
+
+
+# ──────────────────────────────────────────────
+# Penaltı atışı istatistikleri
+# ──────────────────────────────────────────────
+
+def load_shootouts() -> pd.DataFrame:
+    """data/raw/shootouts.csv yükler (historical penaltı serileri)."""
+    from typing import Dict as _Dict
+    path = FILES.get("shootouts", "")
+    if not path or not os.path.exists(path):
+        return pd.DataFrame(columns=["home_team", "away_team", "winner"])
+    try:
+        return pd.read_csv(path)
+    except Exception:
+        return pd.DataFrame(columns=["home_team", "away_team", "winner"])
+
+
+def compute_penalty_stats() -> dict:
+    """Her takım için historical penaltı kazanma oranı döner (0..1)."""
+    df = load_shootouts()
+    if df.empty:
+        return {}
+    stats: dict = {}
+    for _, row in df.iterrows():
+        try:
+            home = str(row["home_team"])
+            away = str(row["away_team"])
+            winner = str(row["winner"])
+        except (KeyError, TypeError):
+            continue
+        for team in [home, away]:
+            if team not in stats:
+                stats[team] = {"wins": 0, "total": 0}
+            stats[team]["total"] += 1
+            if team == winner:
+                stats[team]["wins"] += 1
+    return {
+        t: d["wins"] / d["total"] if d["total"] > 0 else 0.5
+        for t, d in stats.items()
+    }
