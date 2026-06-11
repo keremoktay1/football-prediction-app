@@ -66,6 +66,16 @@ FIFA3_TO_TEAM: dict[str, str] = {
     "UZB": "Uzbekistan",
     "CUW": "Curaçao",
     "RSA": "South Africa",
+    # Eksik olan ama veri setinde bulunan ülkeler
+    "TUR": "Turkey",        # Türkiye — 19 oyuncu var (Çalhanoğlu, Güler, Kadıoğlu vb.)
+    "SVK": "Slovakia",
+    "SRB": "Serbia",
+    "SVN": "Slovenia",
+    "HUN": "Hungary",
+    "ALB": "Albania",
+    "ROU": "Romania",
+    "GEO": "Georgia",
+    "MKD": "North Macedonia",
 }
 
 TOP5_LEAGUE_KEYWORDS = [
