@@ -378,6 +378,68 @@ else:
         else:
             st.info("Kadro verisi yok")
 
+    # ── Radar / Spider chart ─────────────────────────────────────────────────
+    if sq_a or sq_b:
+        try:
+            import plotly.graph_objects as go
+
+            dims = ["top5_league_count", "market_value_proxy", "goals_per90",
+                    "assists_per90", "forward_goals_p90"]
+            dim_labels = ["Top 5 Lig", "Market Değeri", "Gol / 90",
+                          "Asist / 90", "Forvet Gol / 90"]
+
+            # Normalize: use full squad_df range so chart is comparable across all teams
+            if not squad_df.empty:
+                max_vals = {}
+                for d in dims:
+                    col_max = squad_df[d].max() if d in squad_df.columns else 1.0
+                    max_vals[d] = max(float(col_max) if not pd.isna(col_max) else 1.0, 1e-6)
+            else:
+                max_vals = {d: 1.0 for d in dims}
+
+            def radar_vals(sq: dict) -> list[float]:
+                if not sq:
+                    return [0.0] * len(dims)
+                return [min(float(sq.get(d, 0) or 0) / max_vals[d], 1.0) for d in dims]
+
+            rv_a = radar_vals(sq_a) + [radar_vals(sq_a)[0]]  # close polygon
+            rv_b = radar_vals(sq_b) + [radar_vals(sq_b)[0]]
+            theta = dim_labels + [dim_labels[0]]
+
+            fig_radar = go.Figure()
+            fig_radar.add_trace(go.Scatterpolar(
+                r=rv_a, theta=theta, fill="toself", name=team_a,
+                line=dict(color="#4e9af1", width=2),
+                fillcolor="rgba(78,154,241,0.20)",
+            ))
+            fig_radar.add_trace(go.Scatterpolar(
+                r=rv_b, theta=theta, fill="toself", name=team_b,
+                line=dict(color="#e74c3c", width=2),
+                fillcolor="rgba(231,76,60,0.20)",
+            ))
+            fig_radar.update_layout(
+                polar=dict(
+                    bgcolor="#151521",
+                    radialaxis=dict(
+                        visible=True, range=[0, 1],
+                        tickvals=[0.25, 0.5, 0.75, 1.0],
+                        ticktext=["25%", "50%", "75%", "100%"],
+                        gridcolor="#333", tickfont=dict(color="#aaa"),
+                    ),
+                    angularaxis=dict(color="white", gridcolor="#333"),
+                ),
+                showlegend=True,
+                height=380,
+                paper_bgcolor="#0E1117",
+                font_color="white",
+                title="Kadro Radar Analizi (Ligin maksimumuna göre normalize)",
+                margin=dict(t=60, b=20, l=20, r=20),
+                legend=dict(bgcolor="#151521", bordercolor="#333", borderwidth=1),
+            )
+            st.plotly_chart(fig_radar, use_container_width=True)
+        except Exception:
+            pass  # Plotly yoksa sessizce atla
+
 st.markdown("---")
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -437,16 +499,75 @@ st.caption(f"Yöntem: {method_note}")
 upset_risk = float(direct.get("upset_risk", 0.5))
 st.progress(min(1.0, upset_risk), text=f"Sürpriz Riski: {upset_risk*100:.0f}%")
 
-# Poisson skor tahmini
+# ── Poisson Skor Isı Haritası ─────────────────────────────────────────────────
 lh = direct.get("lambda_home")
 la = direct.get("lambda_away")
 if lh and la and not np.isnan(lh) and not np.isnan(la):
-    with st.expander("📊 Tahmini Skor Olasılıkları (Poisson)", expanded=False):
-        score_tbl = poisson_score_table(lh, la)
-        score_tbl.columns = ["Skor", "Olasılık %", "_prob"]
-        st.dataframe(
-            score_tbl[["Skor", "Olasılık %"]],
-            use_container_width=False,
-            hide_index=True,
-        )
-        st.caption(f"Beklenen gol: {team_a} {lh:.2f} — {team_b} {la:.2f}")
+    with st.expander("📊 Poisson Skor Isı Haritası", expanded=True):
+        try:
+            import math
+            import plotly.graph_objects as go
+
+            MAX_G = 6
+            # Compute full probability matrix
+            lh_arr = np.array([np.exp(-lh) * lh**k / math.factorial(k) for k in range(MAX_G)])
+            la_arr = np.array([np.exp(-la) * la**k / math.factorial(k) for k in range(MAX_G)])
+            z = np.outer(lh_arr, la_arr)  # z[home_goals, away_goals]
+            z_pct = z * 100
+
+            labels = [str(i) for i in range(MAX_G)]
+            text_matrix = [[f"{z_pct[h, a]:.1f}%" for a in range(MAX_G)] for h in range(MAX_G)]
+
+            fig_heat = go.Figure(go.Heatmap(
+                z=z_pct,
+                x=labels,
+                y=labels,
+                text=text_matrix,
+                texttemplate="%{text}",
+                colorscale="YlOrRd",
+                showscale=True,
+                colorbar=dict(title="%", tickfont=dict(color="white"), titlefont=dict(color="white")),
+            ))
+
+            # Star on most likely score
+            best_h, best_a = np.unravel_index(z.argmax(), z.shape)
+            fig_heat.add_annotation(
+                x=best_a, y=best_h,
+                text="★", font=dict(size=22, color="white"),
+                showarrow=False, xref="x", yref="y",
+            )
+
+            # Diagonal separators (draw / home-win / away-win regions)
+            # Add subtle shapes using annotations is complex; skip for clean look.
+
+            fig_heat.update_layout(
+                title=f"Skor Olasılıkları — {team_a} (↑) vs {team_b} (→)  ·  ★ = En olası skor",
+                xaxis=dict(title=f"{team_b} Golü", color="white", gridcolor="#333"),
+                yaxis=dict(title=f"{team_a} Golü", color="white", gridcolor="#333", autorange="reversed"),
+                height=400,
+                paper_bgcolor="#0E1117",
+                plot_bgcolor="#0E1117",
+                font_color="white",
+                margin=dict(t=60, b=40, l=80, r=20),
+            )
+            st.plotly_chart(fig_heat, use_container_width=True)
+
+            # Derived win/draw probabilities from the matrix
+            h_idx, a_idx = np.mgrid[0:MAX_G, 0:MAX_G]
+            p_hw = float(np.sum(z[h_idx > a_idx]))
+            p_dr = float(np.sum(z[h_idx == a_idx]))
+            p_aw = float(np.sum(z[h_idx < a_idx]))
+
+            pc1, pc2, pc3 = st.columns(3)
+            pc1.metric(f"{team_a} Kazanır", f"{p_hw*100:.1f}%")
+            pc2.metric("Beraberlik", f"{p_dr*100:.1f}%")
+            pc3.metric(f"{team_b} Kazanır", f"{p_aw*100:.1f}%")
+            st.caption(f"λ {team_a}={lh:.2f}  ·  λ {team_b}={la:.2f}  ·  "
+                       f"En olası skor: **{best_h}–{best_a}** ({z_pct[best_h, best_a]:.1f}%)")
+
+        except Exception:
+            # Fallback table
+            score_tbl = poisson_score_table(lh, la)
+            score_tbl.columns = ["Skor", "Olasılık %", "_prob"]
+            st.dataframe(score_tbl[["Skor", "Olasılık %"]], use_container_width=False, hide_index=True)
+            st.caption(f"Beklenen gol: {team_a} {lh:.2f} — {team_b} {la:.2f}")

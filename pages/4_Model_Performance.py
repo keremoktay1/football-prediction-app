@@ -43,8 +43,9 @@ MODEL_COLORS = {
     "LightGBM":      "#1abc9c",
 }
 
-tab_test, tab_valid, tab_live, tab_feats = st.tabs([
-    "📊 Test Karşılaştırma", "📈 Validation", "⚡ Canlı Doğruluk", "🔍 Feature Önem"
+tab_test, tab_valid, tab_live, tab_feats, tab_disagree = st.tabs([
+    "📊 Test Karşılaştırma", "📈 Validation", "⚡ Canlı Doğruluk",
+    "🔍 Feature Önem", "🎯 Model Anlaşmazlığı"
 ])
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -288,28 +289,253 @@ with tab_feats:
     if os.path.isfile(_imp_path):
         try:
             import plotly.express as px
+            import plotly.graph_objects as go
 
             imp_df = pd.read_csv(_imp_path)
-            top20  = imp_df.head(20)
-            fig_imp = px.bar(
-                top20[::-1], x="shap_importance", y="feature",
-                orientation="h", title="Top 20 Feature (SHAP Mean |value|)",
-                color="shap_importance", color_continuous_scale="Blues",
-            )
-            fig_imp.update_layout(
-                showlegend=False, height=600,
-                paper_bgcolor="#0E1117", plot_bgcolor="#0E1117",
-                font_color="white",
-                margin=dict(t=50, b=10, l=10, r=10),
-            )
-            st.plotly_chart(fig_imp, use_container_width=True)
+            top20  = imp_df.head(20).copy()
+
+            # Feature kategori renkleri
+            def _feat_cat(name: str) -> str:
+                n = name.lower()
+                if any(k in n for k in ["attack", "goal", "forward"]):
+                    return "Hücum"
+                if any(k in n for k in ["defense", "clean", "failed"]):
+                    return "Savunma"
+                if any(k in n for k in ["form", "streak", "weighted", "points_last"]):
+                    return "Form"
+                if any(k in n for k in ["elo", "experience", "coach", "market", "age", "top5", "assists"]):
+                    return "Takım Kalitesi"
+                if any(k in n for k in ["h2h", "common", "transitive"]):
+                    return "H2H / Geçişli"
+                if any(k in n for k in ["neutral", "altitude", "temp", "travel", "tournament"]):
+                    return "Bağlam"
+                return "Diğer"
+
+            cat_colors = {
+                "Hücum":         "#e74c3c",
+                "Savunma":       "#3498db",
+                "Form":          "#2ecc71",
+                "Takım Kalitesi":"#f39c12",
+                "H2H / Geçişli": "#9b59b6",
+                "Bağlam":        "#1abc9c",
+                "Diğer":         "#95a5a6",
+            }
+            top20["category"] = top20["feature"].apply(_feat_cat)
+            top20["color"]     = top20["category"].map(cat_colors)
+
+            view_mode = st.radio("Görünüm", ["Yatay Bar", "Treemap"], horizontal=True)
+
+            if view_mode == "Yatay Bar":
+                fig_imp = go.Figure()
+                for cat, grp in top20[::-1].groupby("category", sort=False):
+                    fig_imp.add_trace(go.Bar(
+                        x=grp["shap_importance"],
+                        y=grp["feature"],
+                        orientation="h",
+                        name=cat,
+                        marker_color=cat_colors.get(cat, "#888"),
+                        text=[f"{v:.4f}" for v in grp["shap_importance"]],
+                        textposition="outside",
+                    ))
+                fig_imp.update_layout(
+                    barmode="stack",
+                    title="Top 20 Feature — SHAP Mean |value|  (renk = kategori)",
+                    height=620,
+                    paper_bgcolor="#0E1117", plot_bgcolor="#0E1117",
+                    font_color="white",
+                    margin=dict(t=50, b=10, l=10, r=10),
+                    xaxis=dict(gridcolor="#333"),
+                    legend=dict(bgcolor="#1a1a2e", bordercolor="#333", borderwidth=1),
+                )
+                st.plotly_chart(fig_imp, use_container_width=True)
+            else:
+                all_imp = imp_df[imp_df["shap_importance"] > 0].copy()
+                all_imp["category"] = all_imp["feature"].apply(_feat_cat)
+                fig_tree = px.treemap(
+                    all_imp,
+                    path=[px.Constant("SHAP"), "category", "feature"],
+                    values="shap_importance",
+                    color="shap_importance",
+                    color_continuous_scale="RdYlGn",
+                    title="SHAP Feature Önemi — Treemap (büyük kutu = daha önemli)",
+                )
+                fig_tree.update_traces(
+                    textinfo="label+percent entry",
+                    insidetextfont=dict(color="white"),
+                )
+                fig_tree.update_layout(
+                    height=560,
+                    paper_bgcolor="#0E1117",
+                    font_color="white",
+                    margin=dict(t=50, b=10, l=10, r=10),
+                )
+                st.plotly_chart(fig_tree, use_container_width=True)
+
             with st.expander("Tüm feature listesi"):
-                st.dataframe(imp_df, use_container_width=True, hide_index=True)
+                imp_full = imp_df.copy()
+                imp_full["category"] = imp_full["feature"].apply(_feat_cat)
+                st.dataframe(imp_full, use_container_width=True, hide_index=True)
+
         except ImportError:
             imp_df = pd.read_csv(_imp_path)
             st.dataframe(imp_df, use_container_width=True, hide_index=True)
     else:
         st.info("feature_importance.csv bulunamadı. fast_model_training.py çalıştırın.")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SEKME 5 — Model Anlaşmazlığı
+# ══════════════════════════════════════════════════════════════════════════════
+with tab_disagree:
+    st.markdown("## Model Anlaşmazlık Haritası")
+    st.caption("Modeller hangi maçlarda ayrışıyor? Yüksek anlaşmazlık = sürpriz riski yüksek maç.")
+
+    _all_path = os.path.join(APP_DIR, "data", "processed", "predictions_all_models.csv")
+    if not os.path.isfile(_all_path):
+        st.warning("predictions_all_models.csv bulunamadı. fast_model_training.py çalıştırın.")
+    else:
+        try:
+            import plotly.express as px
+            import plotly.graph_objects as go
+
+            all_preds = pd.read_csv(_all_path)
+
+            # ── Pivot: her maç × her model → p_home ─────────────────────────
+            pivot = all_preds.pivot_table(
+                index=["match_id", "group", "home_team", "away_team"],
+                columns="model",
+                values="p_home",
+            ).reset_index()
+            pivot.columns.name = None
+
+            model_cols = [c for c in pivot.columns
+                          if c not in ("match_id", "group", "home_team", "away_team")]
+
+            # Std deviation across models = "disagreement score"
+            pivot["disagreement"] = pivot[model_cols].std(axis=1)
+            pivot["match_label"] = pivot["home_team"] + " vs " + pivot["away_team"]
+
+            # Ensemble p_home for x-axis
+            ens_col = "Ensemble" if "Ensemble" in model_cols else model_cols[-1]
+            pivot["ensemble_p_home"] = pivot[ens_col]
+
+            # ── Chart 1: Scatter — Ensemble vs each model ───────────────────
+            st.markdown("### Model Dağılımı vs Ensemble")
+            scatter_models = [m for m in model_cols if m != ens_col]
+
+            fig_sc = go.Figure()
+            # Diagonal reference
+            fig_sc.add_trace(go.Scatter(
+                x=[0, 1], y=[0, 1], mode="lines",
+                line=dict(color="#555", dash="dot", width=1),
+                name="Eşit",
+                showlegend=True,
+            ))
+            mcolors = {
+                "Elo Baseline": "#8c8c8c", "Poisson": "#4e9af1",
+                "LR": "#f4a442", "Random Forest": "#9b59b6",
+                "XGBoost": "#e74c3c", "LightGBM": "#1abc9c",
+            }
+            for mdl in scatter_models:
+                if mdl not in pivot.columns:
+                    continue
+                sub = pivot.dropna(subset=[mdl, ens_col])
+                fig_sc.add_trace(go.Scatter(
+                    x=sub[ens_col],
+                    y=sub[mdl],
+                    mode="markers",
+                    name=mdl,
+                    marker=dict(
+                        color=mcolors.get(mdl, "#888"),
+                        size=7, opacity=0.75,
+                        line=dict(color="white", width=0.3),
+                    ),
+                    text=sub["match_label"],
+                    hovertemplate="%{text}<br>Ensemble: %{x:.2f}<br>" + mdl + ": %{y:.2f}<extra></extra>",
+                ))
+            fig_sc.update_layout(
+                title="Her Maç: Ensemble p(Ev Sahibi) vs Diğer Modeller",
+                xaxis=dict(title="Ensemble p(Ev Sahibi)", gridcolor="#333",
+                           range=[0, 1], zeroline=False),
+                yaxis=dict(title="Model p(Ev Sahibi)", gridcolor="#333",
+                           range=[0, 1], zeroline=False),
+                height=420,
+                paper_bgcolor="#0E1117", plot_bgcolor="#0E1117",
+                font_color="white",
+                margin=dict(t=50, b=40, l=50, r=20),
+                legend=dict(bgcolor="#1a1a2e", bordercolor="#333"),
+            )
+            st.plotly_chart(fig_sc, use_container_width=True)
+
+            # ── Chart 2: Top-20 most disputed matches ───────────────────────
+            st.markdown("### En Çok Tartışmalı 20 Maç")
+            top_disputed = pivot.nlargest(20, "disagreement").sort_values("disagreement", ascending=True)
+
+            fig_dis = go.Figure()
+            for mdl in model_cols:
+                if mdl not in top_disputed.columns:
+                    continue
+                fig_dis.add_trace(go.Scatter(
+                    x=top_disputed[mdl],
+                    y=top_disputed["match_label"],
+                    mode="markers",
+                    name=mdl,
+                    marker=dict(color=mcolors.get(mdl, "#888"), size=9, opacity=0.85),
+                    hovertemplate=mdl + ": %{x:.2f}<extra></extra>",
+                ))
+            fig_dis.update_layout(
+                title="Modeller Arası En Fazla Ayrışan Maçlar (σ en yüksek)",
+                xaxis=dict(title="p(Ev Sahibi Kazanır)", gridcolor="#333",
+                           range=[0, 1], zeroline=False),
+                yaxis=dict(gridcolor="#333", automargin=True),
+                height=520,
+                paper_bgcolor="#0E1117", plot_bgcolor="#0E1117",
+                font_color="white",
+                margin=dict(t=50, b=40, l=20, r=20),
+                legend=dict(bgcolor="#1a1a2e", bordercolor="#333"),
+            )
+            st.plotly_chart(fig_dis, use_container_width=True)
+
+            # ── Chart 3: Per-group average disagreement ──────────────────────
+            if "group" in pivot.columns:
+                st.markdown("### Grup Bazlı Ortalama Anlaşmazlık")
+                grp_dis = (
+                    pivot.groupby("group")["disagreement"]
+                    .mean()
+                    .reset_index()
+                    .sort_values("disagreement", ascending=False)
+                )
+                fig_grp = px.bar(
+                    grp_dis, x="group", y="disagreement",
+                    color="disagreement", color_continuous_scale="OrRd",
+                    title="Grup Bazlı Model Anlaşmazlığı (yüksek = belirsiz grup)",
+                    text=grp_dis["disagreement"].round(3),
+                )
+                fig_grp.update_traces(textposition="outside")
+                fig_grp.update_layout(
+                    height=300, showlegend=False,
+                    paper_bgcolor="#0E1117", plot_bgcolor="#0E1117",
+                    font_color="white",
+                    margin=dict(t=50, b=20, l=20, r=20),
+                    xaxis=dict(gridcolor="#333"),
+                    yaxis=dict(gridcolor="#333"),
+                )
+                st.plotly_chart(fig_grp, use_container_width=True)
+
+            # Summary table
+            with st.expander("Tüm Maçlar — Anlaşmazlık Tablosu"):
+                show_cols = ["group", "match_label", "disagreement"] + [
+                    c for c in model_cols if c in pivot.columns
+                ]
+                st.dataframe(
+                    pivot[show_cols]
+                    .sort_values("disagreement", ascending=False)
+                    .rename(columns={"match_label": "Maç", "disagreement": "σ (Anlaşmazlık)"})
+                    .reset_index(drop=True),
+                    use_container_width=True, hide_index=True,
+                )
+
+        except Exception as exc:
+            st.error(f"Anlaşmazlık grafiği oluşturulamadı: {exc}")
 
 st.markdown("---")
 st.caption(
