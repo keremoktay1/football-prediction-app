@@ -254,15 +254,17 @@ def load_models() -> Optional[dict]:
 
     # Dosya isimleri notebook 03_model_training.ipynb çıktısıyla birebir eşleşir
     model_candidates = {
-        "lr_model":        ["lr_model.pkl",        "lr_model.joblib"],
-        "preprocessor":    ["preprocessor.pkl",    "preprocessor.joblib"],
-        "home_goal_model": ["home_goal_model.pkl", "home_goal_model.joblib"],
-        "away_goal_model": ["away_goal_model.pkl", "away_goal_model.joblib"],
-        "poisson_imputer": ["poisson_imputer.pkl", "poisson_imputer.joblib"],
-        "poisson_scaler":  ["poisson_scaler.pkl",  "poisson_scaler.joblib"],
-        # İleride eklenecek modeller
-        "rf_model":        ["rf_model.pkl",        "rf_model.joblib"],
-        "xgb_model":       ["xgb_model.pkl",       "xgb_model.joblib"],
+        "lr_model":              ["lr_model.pkl",              "lr_model.joblib"],
+        "preprocessor":          ["preprocessor.pkl",          "preprocessor.joblib"],
+        "home_goal_model":       ["home_goal_model.pkl",       "home_goal_model.joblib"],
+        "away_goal_model":       ["away_goal_model.pkl",       "away_goal_model.joblib"],
+        "poisson_imputer":       ["poisson_imputer.pkl",       "poisson_imputer.joblib"],
+        "poisson_scaler":        ["poisson_scaler.pkl",        "poisson_scaler.joblib"],
+        "poisson_imputer_away":  ["poisson_imputer_away.pkl",  "poisson_imputer_away.joblib"],
+        "poisson_scaler_away":   ["poisson_scaler_away.pkl",   "poisson_scaler_away.joblib"],
+        "rf_model":              ["rf_model.pkl",              "rf_model.joblib"],
+        "xgb_model":             ["xgb_model.pkl",             "xgb_model.joblib"],
+        "lgb_model":             ["lgb_model.pkl",             "lgb_model.joblib"],
     }
 
     models: dict = {}
@@ -279,10 +281,6 @@ def load_models() -> Optional[dict]:
 
     return models if models else None
 
-
-# ──────────────────────────────────────────────
-# Elo map yardımcısı
-# ──────────────────────────────────────────────
 
 # ──────────────────────────────────────────────
 # Model karşılaştırma sonuçları
@@ -348,7 +346,6 @@ def load_per_model_predictions() -> Optional[pd.DataFrame]:
 
 def load_shootouts() -> pd.DataFrame:
     """data/raw/shootouts.csv yükler (historical penaltı serileri)."""
-    from typing import Dict as _Dict
     path = FILES.get("shootouts", "")
     if not path or not os.path.exists(path):
         return pd.DataFrame(columns=["home_team", "away_team", "winner"])

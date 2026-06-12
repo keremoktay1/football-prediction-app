@@ -122,6 +122,19 @@ if sim_df is None or sim_df.empty:
     st.info("Simülasyon verisi yok. Butona basın.")
     st.stop()
 
+# ── Kümülatif "tura gelme" olasılıkları ─────────────────────────────────────
+# WC formatında yarı final kaybedenlerin tamamı 3.'lük oynuyor;
+# p_semi her zaman 0 olduğundan kümülatif sütunlar hesaplanıyor.
+_g  = sim_df.get
+sim_df["p_reached_final"]   = (sim_df["p_champion"]
+                                + sim_df["p_finalist"])
+sim_df["p_reached_semi"]    = (sim_df["p_reached_final"]
+                                + sim_df.get("p_third",  0)
+                                + sim_df.get("p_fourth", 0))
+sim_df["p_reached_quarter"] = sim_df["p_reached_semi"]    + sim_df.get("p_quarter",  0)
+sim_df["p_reached_r16"]     = sim_df["p_reached_quarter"] + sim_df.get("p_round16",  0)
+sim_df["p_reached_r32"]     = sim_df["p_reached_r16"]     + sim_df.get("p_round32",  0)
+
 st.markdown("---")
 
 # ── Özet metrikler ────────────────────────────────────────────────────────────
@@ -133,9 +146,9 @@ for col, medal, (_, row) in zip([c1, c2, c3], medals, top3.iterrows()):
         st.metric(
             label=f"{medal} {row['team']}",
             value=f"{row['p_champion']:.1%}",
-            help=f"Finalist: {row['p_finalist']:.1%} | "
-                 f"Yarı: {row['p_semi']:.1%} | "
-                 f"Çeyrek: {row['p_quarter']:.1%}",
+            help=f"Finale çıkar: {row['p_reached_final']:.1%} | "
+                 f"Yarı Finale çıkar: {row['p_reached_semi']:.1%} | "
+                 f"Çeyrek geçer: {row['p_reached_quarter']:.1%}",
         )
 
 st.markdown("---")
@@ -177,12 +190,12 @@ try:
     import plotly.graph_objects as go
 
     _stages = [
-        ("p_round32",  "Son 32"),
-        ("p_round16",  "Son 16"),
-        ("p_quarter",  "Çeyrek"),
-        ("p_semi",     "Yarı Final"),
-        ("p_finalist", "Final"),
-        ("p_champion", "Şampiyon"),
+        ("p_reached_r32",     "Son 32 Geçer"),
+        ("p_reached_r16",     "Son 16 Geçer"),
+        ("p_reached_quarter", "Çeyrek Geçer"),
+        ("p_reached_semi",    "Yarı Final"),
+        ("p_finalist",        "Final"),
+        ("p_champion",        "Şampiyon"),
     ]
     avail = [(col, lbl) for col, lbl in _stages if col in sim_df.columns]
     if avail:
@@ -317,12 +330,12 @@ try:
     st.markdown("#### Top 8 Takım — Eleme Turu Yolculuğu")
 
     _stages = [
-        ("p_round32",  "Son 32"),
-        ("p_round16",  "Son 16"),
-        ("p_quarter",  "Çeyrek"),
-        ("p_semi",     "Yarı Final"),
-        ("p_finalist", "Final"),
-        ("p_champion", "Şampiyon"),
+        ("p_reached_r32",     "Son 32 Geçer"),
+        ("p_reached_r16",     "Son 16 Geçer"),
+        ("p_reached_quarter", "Çeyrek Geçer"),
+        ("p_reached_semi",    "Yarı Final"),
+        ("p_finalist",        "Final"),
+        ("p_champion",        "Şampiyon"),
     ]
     stage_cols = [col for col, _ in _stages if col in sim_df.columns]
     stage_labels = [lbl for col, lbl in _stages if col in sim_df.columns]
@@ -485,18 +498,19 @@ st.markdown("---")
 st.markdown("#### Tüm Turnuva Olasılıkları")
 
 display = sim_df.copy()
-for col in ["p_champion", "p_finalist", "p_semi", "p_quarter", "p_round16", "p_round32"]:
+for col in ["p_champion", "p_finalist",
+            "p_reached_semi", "p_reached_quarter", "p_reached_r16", "p_reached_r32"]:
     if col in display.columns:
         display[col] = (display[col] * 100).round(1).astype(str) + "%"
 
 col_labels = {
-    "team":       "Takım",
-    "p_champion": "🏆 Şampiyon",
-    "p_finalist": "🥈 Finalist",
-    "p_semi":     "4'lü Final",
-    "p_quarter":  "Çeyrek",
-    "p_round16":  "Son 16",
-    "p_round32":  "Son 32",
+    "team":               "Takım",
+    "p_champion":         "🏆 Şampiyon",
+    "p_finalist":         "🥈 Finalist",
+    "p_reached_semi":     "Yarı Final",
+    "p_reached_quarter":  "Çeyrek",
+    "p_reached_r16":      "Son 16",
+    "p_reached_r32":      "Son 32",
 }
 show_cols = [c for c in col_labels if c in display.columns]
 st.dataframe(

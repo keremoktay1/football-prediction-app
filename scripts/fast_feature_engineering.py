@@ -613,28 +613,6 @@ def get_common_opponent_diff(
 
 
 # ── Upset risk ────────────────────────────────────────────────────────────────
-def compute_upset_risk(elo_diff: float, underdog_form: float,
-                       favorite_form: float, neutral: int) -> float:
-    if np.isnan(elo_diff) or elo_diff == 0:
-        return 0.5
-    abs_diff = abs(elo_diff)
-    elo_component = 1 - min(abs_diff / 600.0, 1.0)
-    underdog_form_score = 0.5
-    if not np.isnan(underdog_form) and underdog_form > 0:
-        underdog_form_score = min(underdog_form / (ROLLING_FORM_WINDOW * 3), 1.0)
-    fav_neg_momentum = 0.5
-    if not np.isnan(favorite_form) and favorite_form > 0:
-        fav_neg_momentum = 1 - min(favorite_form / (ROLLING_FORM_WINDOW * 3), 1.0)
-    neutral_component = 0.3 if neutral else 0.0
-    upset_risk = (
-        0.40 * elo_component
-        + 0.25 * underdog_form_score
-        + 0.20 * fav_neg_momentum
-        + 0.10 * neutral_component
-        + 0.05 * 0.5
-    )
-    return round(min(max(upset_risk, 0.0), 1.0), 4)
-
 def upset_label(score: float) -> str:
     if score >= 0.65: return "Yüksek"
     if score >= 0.45: return "Orta"

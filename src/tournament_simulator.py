@@ -324,12 +324,23 @@ def _fast_standings(
     return standings
 
 
+def _compute_rest_days(team: str, ko_date, last_played: Dict[str, str]) -> int:
+    """Takımın son maçından bu yana geçen gün sayısını döner."""
+    prev = last_played.get(team)
+    if prev is None or ko_date is None:
+        return 7
+    try:
+        return max(0, (ko_date - pd.Timestamp(prev)).days)
+    except Exception:
+        return 7
+
+
 def _sample_goals(lh: float, la: float, outcome: int, rng) -> Tuple[int, int]:
     """
     Poisson'dan gol sayısı örnekle; outcome (0=H, 1=D, 2=A) tutarlı olsun.
-    3 denemede tutarsızsa düz skor kullan.
+    100 denemede tutarsızsa düz skor kullan.
     """
-    for _ in range(3):
+    for _ in range(100):
         hg = rng.poisson(lh)
         ag = rng.poisson(la)
         if outcome == 0 and hg > ag:
@@ -671,17 +682,8 @@ def run_simulation(
             except Exception:
                 ko_date = None
 
-            def _rest_days(team: str) -> int:
-                prev = last_played.get(team)
-                if prev is None or ko_date is None:
-                    return 7
-                try:
-                    return max(0, (ko_date - pd.Timestamp(prev)).days)
-                except Exception:
-                    return 7
-
-            rest_h = _rest_days(home)
-            rest_a = _rest_days(away)
+            rest_h = _compute_rest_days(home, ko_date, last_played)
+            rest_a = _compute_rest_days(away, ko_date, last_played)
 
             # Seyahat mesafeleri — takım koordinatlarından venue'ya
             v_lat = ko.get("lat", 39.0)
@@ -739,11 +741,20 @@ def run_simulation(
         if finalist:
             counts[finalist]["finalist"] += 1
 
-        # Semi-finalistler = son 4 mağlup
+        # Üçüncülük playoff'u oynayan takımları topla (double-count önlemi)
+        third_place_teams: set = set()
+        for _tp in ko_list:
+            if _tp["round"] == "Third-place playoff":
+                _tpw = ko_winners.get(_tp["match_id"])
+                _tpl = ko_winners.get(f"loser_{_tp['match_id']}")
+                if _tpw: third_place_teams.add(_tpw)
+                if _tpl: third_place_teams.add(_tpl)
+
+        # Semi-finalistler = yarı final kaybedenler (üçüncülük oynayacaklar hariç)
         semi_match_ids = [ko["match_id"] for ko in ko_list if ko["round"] == "Semi-final"]
         for smid in semi_match_ids:
             loser = ko_winners.get(f"loser_{smid}")
-            if loser:
+            if loser and loser not in third_place_teams:
                 counts[loser]["semi"] += 1
 
         quarter_ids = [ko["match_id"] for ko in ko_list if ko["round"] == "Quarter-final"]

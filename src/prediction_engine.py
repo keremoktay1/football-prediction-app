@@ -30,7 +30,6 @@ FEATURE_COLS = [
     "attack_away",
     "defense_away",
     "neutral",
-    "tournament_weight",
     # ── Yeni feature'lar ──
     "points_last_5_home",
     "points_last_5_away",
@@ -187,12 +186,14 @@ def predict_with_model(
 
     Returns None eğer model yüklenemezse veya hata olursa.
     """
-    lr_model    = models.get("lr_model")
+    lr_model     = models.get("lr_model")
     preprocessor = models.get("preprocessor")
-    home_goal   = models.get("home_goal_model")
-    away_goal   = models.get("away_goal_model")
-    poi_imp     = models.get("poisson_imputer")
-    poi_scl     = models.get("poisson_scaler")
+    home_goal    = models.get("home_goal_model")
+    away_goal    = models.get("away_goal_model")
+    poi_imp      = models.get("poisson_imputer")
+    poi_scl      = models.get("poisson_scaler")
+    poi_imp_a    = models.get("poisson_imputer_away", poi_imp)
+    poi_scl_a    = models.get("poisson_scaler_away",  poi_scl)
 
     if lr_model is None or preprocessor is None:
         return None
@@ -215,7 +216,7 @@ def predict_with_model(
             elif cls == 2:
                 p["p_away"] = float(proba[i])
 
-        # --- Poisson lambda (home/away ayrı feature setleri) ---
+        # --- Poisson lambda (home/away ayrı scaler) ---
         lh = la = None
         if home_goal and away_goal and poi_imp and poi_scl:
             try:
@@ -225,10 +226,11 @@ def predict_with_model(
                 lh = max(0.3, float(home_goal.predict(X_poi_h_t)[0]))
 
                 # Away gol modeli: away saldırı + home savunma + ters elo_diff
+                # Away'e özel imputer/scaler kullan (fallback: home scaler)
                 away_row = {c: features_row.get(c, np.nan) for c in POISSON_AWAY_FEATS}
                 away_row["elo_diff"] = -(away_row.get("elo_diff") or 0)
                 X_poi_a = pd.DataFrame([away_row])
-                X_poi_a_t = poi_scl.transform(poi_imp.transform(X_poi_a))
+                X_poi_a_t = poi_scl_a.transform(poi_imp_a.transform(X_poi_a))
                 la = max(0.3, float(away_goal.predict(X_poi_a_t)[0]))
             except Exception:
                 pass

@@ -10,8 +10,10 @@ Girdi:  data/processed/features_historical.csv
         models/preprocessor.pkl
         models/home_goal_model.pkl
         models/away_goal_model.pkl
-        models/poisson_imputer.pkl
-        models/poisson_scaler.pkl
+        models/poisson_imputer.pkl       (home — backward-compat)
+        models/poisson_scaler.pkl        (home — backward-compat)
+        models/poisson_imputer_away.pkl
+        models/poisson_scaler_away.pkl
         models/rf_model.pkl
         models/xgb_model.pkl
         models/lgb_model.pkl          (lightgbm kuruluysa)
@@ -75,7 +77,6 @@ FEATURE_COLS = [
     "attack_away",
     "defense_away",
     "neutral",
-    "tournament_weight",
     # ── Form + gol istatistikleri ──
     "points_last_5_home",
     "points_last_5_away",
@@ -346,6 +347,7 @@ try:
     print(f"  Calibrated Test  LL: {log_loss(y_test,  cal_test_prob,  labels=[0,1,2]):.4f}")
     if log_loss(y_test, cal_test_prob, labels=[0,1,2]) < log_loss(y_test, lr_test_prob, labels=[0,1,2]):
         print("  Kalibrasyon iyileştirdi — calibrated LR kullanılacak.")
+        lr_model = calibrated_lr
         lr_valid_prob = cal_valid_prob
         lr_test_prob  = cal_test_prob
 except Exception as _cal_err:
@@ -354,22 +356,24 @@ except Exception as _cal_err:
 
 # ── [3] Poisson xG modeli ─────────────────────────────────────────────────────
 print("\n[3] Poisson xG modeli eğitiliyor...")
-imputer_p = SimpleImputer(strategy="median")
-scaler_p  = StandardScaler()
+imputer_p_h = SimpleImputer(strategy="median")
+scaler_p_h  = StandardScaler()
+imputer_p_a = SimpleImputer(strategy="median")
+scaler_p_a  = StandardScaler()
 
-X_p_train_home = scaler_p.fit_transform(
-    imputer_p.fit_transform(train[POISSON_HOME_FEATS])
+X_p_train_home = scaler_p_h.fit_transform(
+    imputer_p_h.fit_transform(train[POISSON_HOME_FEATS])
 )
-X_p_valid_home = scaler_p.transform(imputer_p.transform(valid[POISSON_HOME_FEATS]))
-X_p_test_home  = scaler_p.transform(imputer_p.transform(test[POISSON_HOME_FEATS]))
+X_p_valid_home = scaler_p_h.transform(imputer_p_h.transform(valid[POISSON_HOME_FEATS]))
+X_p_test_home  = scaler_p_h.transform(imputer_p_h.transform(test[POISSON_HOME_FEATS]))
 
 train_away = train[POISSON_AWAY_FEATS].copy(); train_away["elo_diff"] = -train_away["elo_diff"]
 valid_away = valid[POISSON_AWAY_FEATS].copy(); valid_away["elo_diff"] = -valid_away["elo_diff"]
 test_away  = test[POISSON_AWAY_FEATS].copy();  test_away["elo_diff"]  = -test_away["elo_diff"]
 
-X_p_train_away = scaler_p.transform(imputer_p.transform(train_away.values))
-X_p_valid_away = scaler_p.transform(imputer_p.transform(valid_away.values))
-X_p_test_away  = scaler_p.transform(imputer_p.transform(test_away.values))
+X_p_train_away = scaler_p_a.fit_transform(imputer_p_a.fit_transform(train_away))
+X_p_valid_away = scaler_p_a.transform(imputer_p_a.transform(valid_away))
+X_p_test_away  = scaler_p_a.transform(imputer_p_a.transform(test_away))
 
 home_goal_model = Ridge(alpha=1.0)
 home_goal_model.fit(X_p_train_home, train["home_score"].clip(0, 8), sample_weight=train_weights)
@@ -473,7 +477,6 @@ else:
 # ── [7] LightGBM ──────────────────────────────────────────────────────────────
 if HAS_LGB:
     print("\n[7] LightGBM eğitiliyor...")
-    from sklearn.model_selection import RandomizedSearchCV as RSCV
     _lgb_base = lgb.LGBMClassifier(
         objective="multiclass", num_class=3,
         class_weight="balanced", random_state=42, n_jobs=-1, verbose=-1,
@@ -582,9 +585,10 @@ print("\n[7] 2026 fikstür tahminleri...")
 X_future   = future[FEATURE_COLS].copy()
 X_future_t = preprocessor.transform(X_future)
 
-future["p_home_lr"] = lr_model.predict_proba(X_future_t)[:, 0]
-future["p_draw_lr"] = lr_model.predict_proba(X_future_t)[:, 1]
-future["p_away_lr"] = lr_model.predict_proba(X_future_t)[:, 2]
+_lr_future_proba = lr_model.predict_proba(X_future_t)
+future["p_home_lr"] = _lr_future_proba[:, 0]
+future["p_draw_lr"] = _lr_future_proba[:, 1]
+future["p_away_lr"] = _lr_future_proba[:, 2]
 
 # Poisson lambdaları
 poisson_rows = []
@@ -610,7 +614,7 @@ future = future.merge(poisson_df, on="match_id", how="left")
 
 # Ensemble tahmini: optimal ağırlıklı
 _future_probs_list = [
-    lr_model.predict_proba(X_future_t),
+    _lr_future_proba,
     np.column_stack([future["p_home_poi"].values,
                      future["p_draw_poi"].values,
                      future["p_away_poi"].values]),
@@ -660,8 +664,10 @@ joblib.dump(lr_model,        os.path.join(MODEL_DIR, "lr_model.pkl"))
 joblib.dump(preprocessor,    os.path.join(MODEL_DIR, "preprocessor.pkl"))
 joblib.dump(home_goal_model, os.path.join(MODEL_DIR, "home_goal_model.pkl"))
 joblib.dump(away_goal_model, os.path.join(MODEL_DIR, "away_goal_model.pkl"))
-joblib.dump(imputer_p,       os.path.join(MODEL_DIR, "poisson_imputer.pkl"))
-joblib.dump(scaler_p,        os.path.join(MODEL_DIR, "poisson_scaler.pkl"))
+joblib.dump(imputer_p_h,     os.path.join(MODEL_DIR, "poisson_imputer.pkl"))
+joblib.dump(scaler_p_h,      os.path.join(MODEL_DIR, "poisson_scaler.pkl"))
+joblib.dump(imputer_p_a,     os.path.join(MODEL_DIR, "poisson_imputer_away.pkl"))
+joblib.dump(scaler_p_a,      os.path.join(MODEL_DIR, "poisson_scaler_away.pkl"))
 joblib.dump(rf_model,        os.path.join(MODEL_DIR, "rf_model.pkl"))
 if HAS_XGB:
     joblib.dump(xgb_model,   os.path.join(MODEL_DIR, "xgb_model.pkl"))
@@ -763,7 +769,7 @@ elo_future_prob = elo_prob_matrix(X_future)
 _add_model_rows("Elo Baseline", elo_future_prob)
 
 # LR
-_add_model_rows("LR", lr_model.predict_proba(X_future_t))
+_add_model_rows("LR", _lr_future_proba)
 
 # Poisson — extract lambda arrays from already computed poisson_df
 _lh = future["lambda_home"].values if "lambda_home" in future.columns else None
